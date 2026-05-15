@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "canon", "declare"]
+members = ["core", "canon", "declare", "eval"]
 resolver = "2"
 
 [workspace.package]
