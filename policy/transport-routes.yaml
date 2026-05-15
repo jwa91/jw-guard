@@ -1,0 +1,16 @@
+apiVersion: jw-guard/v1alpha1
+kind: TransportRoutesPolicy
+metadata:
+  name: transport-routes-policy
+  version: "1.0.0"
+scope:
+  topology: mesh
+requirements:
+  - from: runtime
+    to: control_plane
+    transport: grpc
+    action: allow
+  - from: runtime
+    to: audit_sink
+    transport: https
+    action: allow

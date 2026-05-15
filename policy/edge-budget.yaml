@@ -1,0 +1,14 @@
+apiVersion: jw-guard/v1alpha1
+kind: EdgeBudgetPolicy
+metadata:
+  name: edge-budget-policy
+  version: "1.0.0"
+scope:
+  graph: dependency
+requirements:
+  - source: package
+    target: service
+    max_edges: 4
+  - source: runtime_component
+    target: runtime_component
+    max_edges: 2

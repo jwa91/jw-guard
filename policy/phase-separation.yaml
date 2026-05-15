@@ -1,0 +1,14 @@
+apiVersion: jw-guard/v1alpha1
+kind: PhaseSeparationPolicy
+metadata:
+  name: phase-separation-policy
+  version: "1.0.0"
+scope:
+  lifecycle: build_runtime
+requirements:
+  - producer: build
+    consumer: sign
+    relation: read_only_handoff
+  - producer: release
+    consumer: runtime
+    relation: isolated

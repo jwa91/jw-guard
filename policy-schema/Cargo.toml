@@ -1,0 +1,17 @@
+[package]
+name = "jw-guard-policy-schema"
+description = "YAML policy schema adapter types for jw-guard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std", "yaml"]
+std = ["serde/std"]
+yaml = ["dep:serde_yaml", "std"]
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_yaml = { version = "0.9", optional = true }

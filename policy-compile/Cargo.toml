@@ -1,0 +1,23 @@
+[package]
+name = "jw-guard-policy-compile"
+description = "Policy document compiler adapter for jw-guard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std"]
+std = [
+    "jw-guard-policy-schema/std",
+    "jw-guard-declare/std",
+    "jw-guard-canon/std",
+    "jw-guard-core/std",
+]
+
+[dependencies]
+jw-guard-policy-schema = { path = "../policy-schema", default-features = false }
+jw-guard-declare = { path = "../declare", default-features = false }
+jw-guard-canon = { path = "../canon", default-features = false }
+jw-guard-core = { path = "../core", default-features = false }

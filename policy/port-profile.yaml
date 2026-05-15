@@ -1,0 +1,16 @@
+apiVersion: jw-guard/v1alpha1
+kind: PortProfilePolicy
+metadata:
+  name: port-profile-policy
+  version: "1.0.0"
+scope:
+  environment: production
+requirements:
+  - profile: control_plane
+    transport: tcp
+    port: 9443
+    exposure: internal
+  - profile: metrics
+    transport: http
+    port: 9090
+    exposure: internal

@@ -1,0 +1,12 @@
+apiVersion: jw-guard/v1alpha1
+kind: ScopePolicy
+metadata:
+  name: scope-policy
+  version: "1.0.0"
+scope:
+  target: workspace
+requirements:
+  - selector: source
+    constraint: in_scope
+  - selector: runtime
+    constraint: out_of_scope
