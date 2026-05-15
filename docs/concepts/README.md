@@ -22,6 +22,7 @@ Read in order:
 9. `08-l4-type-definition.md` - provisional Layer-4 normative semantics candidate (pending semantics decision).
 10. `09-type-axis-detectability.md` - locked L1-L2 detection and foundational deconstructability helper.
 11. `10-graph-primitives-axis.md` - first-principles atomic graph axis for abstraction decisions.
+12. `11-observation-primitives-axis.md` - first-principles atomic observation/applicability axis.
 
 ## Core Principle
 
