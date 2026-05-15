@@ -26,6 +26,16 @@ macro_rules! branded_id {
 }
 
 branded_id! {
+    /// Identifier for the model self object.
+    ModelId
+}
+
+branded_id! {
+    /// Identifier for an abstract referent.
+    ReferentId
+}
+
+branded_id! {
     /// Identifier for a bounded execution domain.
     ZoneId
 }
@@ -76,8 +86,28 @@ branded_id! {
 }
 
 branded_id! {
+    /// Identifier for an abstract requirement declaration.
+    RequirementId
+}
+
+branded_id! {
     /// Identifier for a route policy.
     PolicyId
+}
+
+branded_id! {
+    /// Identifier for an evidence source declaration.
+    EvidenceSourceId
+}
+
+branded_id! {
+    /// Identifier for an observation declaration.
+    ObservationId
+}
+
+branded_id! {
+    /// Identifier for an evaluation declaration.
+    EvaluationId
 }
 
 branded_id! {

@@ -2,6 +2,7 @@ use alloc::{vec, vec::Vec};
 
 use crate::{
     composites::{ArtifactContract, BoundarySpec, SecurityModel},
+    concept_feedback::{run_core_concept_feedback_loop, ConceptLayer},
     enums::{
         Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, IdentityKind,
         IsolationMechanism, SurfaceFacing, TrustBasis, TrustLevel, ZoneKind,
@@ -447,4 +448,24 @@ fn serde_deserialization_enforces_scalar_invariants() {
     assert!(serde_json::from_str::<Port>("0").is_err());
     assert!(serde_json::from_str::<MediaType>("\"not-a-media-type\"").is_err());
     assert!(serde_json::from_str::<NonEmptyVec<MediaType>>("[]").is_err());
+}
+
+#[test]
+fn concept_feedback_loop_passes_primitive_layer_before_advancing() {
+    let report = run_core_concept_feedback_loop();
+    assert!(!report.layers.is_empty());
+    assert_eq!(report.layers[0].layer, ConceptLayer::PrimitiveDatatypes);
+    assert!(report.layers[0].passed());
+}
+
+#[test]
+fn concept_feedback_loop_reaches_top_layer_when_core_atoms_exist() {
+    let report = run_core_concept_feedback_loop();
+    assert_eq!(report.halted_at, None);
+    assert_eq!(report.layers.len(), 6);
+    assert!(report.passed_all());
+    assert!(report
+        .layers
+        .iter()
+        .all(|layer| layer.layer >= ConceptLayer::PrimitiveDatatypes && layer.passed()));
 }

@@ -4,20 +4,24 @@
 extern crate alloc;
 
 pub mod composites;
+pub mod concept_feedback;
 pub mod enums;
 pub mod error;
 pub mod id;
 pub mod scalars;
 pub mod structs;
+pub mod theory;
 pub mod validation;
 
 #[cfg(test)]
 mod tests;
 
 pub use composites::*;
+pub use concept_feedback::*;
 pub use enums::*;
 pub use error::*;
 pub use id::*;
 pub use scalars::*;
 pub use structs::*;
+pub use theory::*;
 pub use validation::*;
