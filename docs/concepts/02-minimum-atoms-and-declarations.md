@@ -279,10 +279,12 @@ A declaration is invalid if:
 
 Current crates approximate this as follows:
 
-- `jw-guard-core` contains many concrete referent and graph atoms.
-- `jw-guard-declare` begins the declaration layer with symbolic names,
-  requirement operators, scope declarations, boundary declarations, and route
-  policy declarations.
+- `jw-guard-core` contains deterministic typed model atoms, composites, and
+  structural validation.
+- `jw-guard-canon` contains deterministic canonicalization primitives (path,
+  ordering, deterministic identity derivation, normalization).
+- declaration-layer implementation is planned and intentionally absent from the
+  active workspace until reintroduced under current lock criteria.
 
 The concept model in this document is stricter than the current code where the
 code still uses narrower terms such as `Zone`, `Route`, or `ScopeKind`.

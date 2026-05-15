@@ -1,42 +1,43 @@
 # Concepts
 
-This folder is the terminology baseline for `jw-guard`.
+## As-Is Situation
 
-The files here are stricter than the draft documents. Drafts may contain
-useful examples, project preferences, or platform-specific opinions. Concepts
-must define the language needed to express those opinions without embedding
-them as universal rules.
+`docs/concepts/` is the active conceptual authority baseline for `jw-guard`.
 
-Read in order:
+Current status model:
 
-1. `00-terminology.md` - locked words and their intended meaning.
-2. `01-fundamental-form.md` - the minimum abstract form of a security model.
-3. `02-minimum-atoms-and-declarations.md` - the smallest type atoms and
-   declaration objects needed for that form.
-4. `03-deterministic-concretisation.md` - how declarations become canonical
-   model referents and how observations are compared without hidden judgment.
-5. `04-loop-control.md` - deterministic control-loop gate for Goal/State/Loop/Mayrun.
-6. `05-l1-type-definition.md` - deterministic Layer-1 type definition over L0 atoms.
-7. `06-l2-typegate.md` - deterministic Layer-2 type-theory gate for composition.
-8. `07-l3-type-definition.md` - provisional Layer-3 graph/reference semantics candidate (pending abstraction strategy).
-9. `08-l4-type-definition.md` - provisional Layer-4 normative semantics candidate (pending semantics decision).
-10. `09-type-axis-detectability.md` - locked L1-L2 detection and foundational deconstructability helper.
-11. `10-graph-primitives-axis.md` - first-principles atomic graph axis for abstraction decisions.
-12. `11-observation-primitives-axis.md` - first-principles atomic observation/applicability axis.
+- locked baseline:
+  - `00-terminology.md`
+  - `01-fundamental-form.md`
+  - `02-minimum-atoms-and-declarations.md`
+  - `03-deterministic-concretisation.md`
+  - `04-loop-control.md`
+  - `05-l1-type-definition.md`
+  - `06-l2-typegate.md`
+  - `09-type-axis-detectability.md`
+  - `10-graph-primitives-axis.md`
+  - `11-observation-primitives-axis.md`
+- provisional:
+  - `07-l3-type-definition.md`
+  - `08-l4-type-definition.md`
 
-## Core Principle
+Interpretation rules:
 
-Security is the typed restriction of permitted relations across declared
-boundaries.
+- concept docs outrank drafts and historical design notes
+- when code diverges from locked concepts, reconcile code or explicitly revise concepts
+- no hidden policy opinion should be introduced into core semantics
 
-A security model is therefore not just topology and not just policy. It is a
-policy-bearing graph of typed referents, boundaries, surfaces, edges, and actors.
+## Goal and Roadmap
 
-## Authority Rule
+Goal:
 
-When a draft conflicts with these concept documents, these concept documents
-win until deliberately revised.
+- Keep concepts as a strict, minimal, deterministic authority aligned to the
+  active implementation (`core` + `canon`) and the non-opinionated north star.
 
-When Rust code conflicts with these concept documents, either the code is wrong
-or the concept document is incomplete. The correction must preserve the
-distinction between neutral vocabulary and project-specific policy opinion.
+Roadmap:
+
+1. keep locked files concise and implementation-relevant
+2. move stale concept material into explicit archival status or remove it
+3. promote provisional `L3/L4` only after explicit strategy lock criteria are met
+4. ensure every concept file maps to a real acceptance gate or core/canon surface
+5. maintain deterministic authority ordering: concepts > code-consistent behavior > drafts
