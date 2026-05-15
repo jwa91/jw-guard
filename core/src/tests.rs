@@ -862,6 +862,105 @@ fn core_theory_validation_rejects_edge_to_without_matching_edge_relation() {
 }
 
 #[test]
+fn core_theory_validation_rejects_requirement_operator_value_mismatch() {
+    let mut library = sample_core_theory_library();
+    library.requirements[0].operator = RequirementOperator::Presence(PresenceOperator::Required);
+    library.requirements[0].value = TypedValue::U64(1);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Requirement(library.requirements[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_requirement_sort_operator_mismatch() {
+    let mut library = sample_core_theory_library();
+    library.requirements[0].sort = RequirementSort::Count;
+    library.requirements[0].operator = RequirementOperator::Presence(PresenceOperator::Required);
+    library.requirements[0].value = TypedValue::Bool(true);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Requirement(library.requirements[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_edge_to_scope_source_sort_invariant_bypass() {
+    let mut library = sample_core_theory_library();
+    library.scopes[0].referent_sort = ReferentSort::Actor;
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo(EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::Boundary,
+        edge_sort: EdgeSort::CrossesBoundary,
+        to: library.referents[1].id,
+    });
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Scope(library.scopes[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_boundary_side_label_invariant_bypass() {
+    let mut library = sample_core_theory_library();
+    library.boundaries[0].side_a.label = SideLabel::B;
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Boundary(library.boundaries[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_boundary_surface_label_invariant_bypass() {
+    let mut library = sample_core_theory_library();
+    library.boundaries[0].surface_a.facing = SideLabel::B;
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Boundary(library.boundaries[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_boundary_surface_boundary_link_invariant_bypass() {
+    let mut library = sample_core_theory_library();
+    library.boundaries[0].surface_a.boundary_id = BoundaryId::from_bytes([98u8; 16]);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Boundary(library.boundaries[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_boundary_distinct_anchor_invariant_bypass() {
+    let mut library = sample_core_theory_library();
+    library.boundaries[0].side_b.anchor = library.boundaries[0].side_a.anchor;
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Boundary(library.boundaries[0].id)
+    }));
+}
+
+#[test]
 fn typed_scope_new_rejects_edge_to_source_sort_mismatch() {
     let scope_id = ScopeId::from_bytes([91u8; 16]);
     let edge_to = EdgeToPredicateDeclaration {

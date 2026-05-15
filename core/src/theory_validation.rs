@@ -9,7 +9,7 @@ use crate::{
         ActorDeclaration, BoundaryDeclaration, EdgeDeclaration, EvaluationDeclaration,
         EvidenceSourceDeclaration, MembershipPredicateDeclaration, ModelDeclaration,
         ObservationDeclaration, PolicyDeclaration, ReferentDeclaration, RequirementDeclaration,
-        TypedScopeDeclaration,
+        RequirementOperator, RequirementSort, SideLabel, TypedScopeDeclaration, TypedValue,
     },
 };
 
@@ -147,6 +147,31 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
     }
 
     for boundary in &library.boundaries {
+        if boundary.side_a.label != SideLabel::A || boundary.side_b.label != SideLabel::B {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Boundary(boundary.id),
+            ));
+        }
+        if boundary.surface_a.facing != SideLabel::A || boundary.surface_b.facing != SideLabel::B {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Boundary(boundary.id),
+            ));
+        }
+        if boundary.surface_a.boundary_id != boundary.id || boundary.surface_b.boundary_id != boundary.id
+        {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Boundary(boundary.id),
+            ));
+        }
+        if boundary.side_a.anchor == boundary.side_b.anchor {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Boundary(boundary.id),
+            ));
+        }
         if !library
             .referents
             .iter()
@@ -192,6 +217,13 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
             }
         }
         if let MembershipPredicateDeclaration::EdgeTo(edge_to) = &scope.predicate {
+            if scope.referent_sort != edge_to.source_sort {
+                violations.push(TheoryViolation::new(
+                    TheoryViolationCode::ContextInvariant,
+                    TheorySubject::Scope(scope.id),
+                ));
+            }
+
             let to_referent_exists = library
                 .referents
                 .iter()
@@ -236,6 +268,17 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                     TheorySubject::Scope(scope.id),
                 ));
             }
+        }
+    }
+
+    for requirement in &library.requirements {
+        if !operator_matches_value(&requirement.operator, &requirement.value)
+            || !sort_matches_operator(&requirement.sort, &requirement.operator)
+        {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Requirement(requirement.id),
+            ));
         }
     }
 
@@ -454,4 +497,40 @@ fn validate_unique_evaluations(evaluations: &[EvaluationDeclaration]) -> Vec<The
         }
     }
     violations
+}
+
+fn operator_matches_value(operator: &RequirementOperator, value: &TypedValue) -> bool {
+    match operator {
+        RequirementOperator::Presence(_) => matches!(value, TypedValue::Bool(_)),
+        RequirementOperator::Order(_) | RequirementOperator::Count(_) => {
+            matches!(value, TypedValue::U64(_))
+        }
+        RequirementOperator::Set(_) => matches!(
+            value,
+            TypedValue::String(_) | TypedValue::ReferentSort(_) | TypedValue::EdgeSort(_)
+        ),
+        RequirementOperator::Temporal(_) => {
+            matches!(value, TypedValue::Timestamp(_) | TypedValue::U64(_))
+        }
+        RequirementOperator::Relation(_) => matches!(
+            value,
+            TypedValue::U64(_)
+                | TypedValue::Bool(_)
+                | TypedValue::ReferentSort(_)
+                | TypedValue::EdgeSort(_)
+        ),
+    }
+}
+
+fn sort_matches_operator(sort: &RequirementSort, operator: &RequirementOperator) -> bool {
+    matches!(
+        (sort, operator),
+        (RequirementSort::Presence, RequirementOperator::Presence(_))
+            | (RequirementSort::Order, RequirementOperator::Order(_))
+            | (RequirementSort::SetMembership, RequirementOperator::Set(_))
+            | (RequirementSort::Count, RequirementOperator::Count(_))
+            | (RequirementSort::Temporal, RequirementOperator::Temporal(_))
+            | (RequirementSort::Relation, RequirementOperator::Relation(_))
+            | (RequirementSort::Custom { .. }, _)
+    )
 }
