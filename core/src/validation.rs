@@ -79,6 +79,8 @@ pub enum ViolationCode {
     RootOfflineCredentialMissing,
     /// Trust grant violates authority or credential rules.
     TrustInvariant,
+    /// Trust was granted by an identity without authority in the target zone.
+    TrustGrantAuthorityMissing,
     /// Artifact contract violates hash/signature rules.
     ArtifactContractInvariant,
     /// Policy violates gate, trust, status, or route invariants.
@@ -467,6 +469,11 @@ pub fn validate_security_model(model: &SecurityModel) -> Vec<Violation> {
     let mut violations = Vec::new();
     violations.extend(validate_unique_zones(&model.zones));
     violations.extend(validate_unique_identities(&model.identities));
+    violations.extend(validate_unique_scopes(&model.scopes));
+    violations.extend(validate_unique_credentials(&model.credentials));
+    violations.extend(validate_unique_trusts(&model.trusts));
+    violations.extend(validate_unique_routes(&model.routes));
+    violations.extend(validate_unique_policies(&model.policies));
     violations.extend(validate_filesystem_roots(&model.zones));
 
     for zone in &model.zones {
@@ -502,6 +509,7 @@ pub fn validate_security_model(model: &SecurityModel) -> Vec<Violation> {
         violations.extend(validate_policy_semantic(policy, model));
     }
     violations.extend(validate_root_offline_credential(model));
+    violations.extend(validate_unique_root_bootstrap_self_grant(model));
     violations.extend(validate_routes_have_gates(model));
     violations
 }
@@ -528,6 +536,76 @@ fn validate_unique_identities(identities: &[Identity]) -> Vec<Violation> {
             violations.push(Violation::error(
                 ViolationCode::DuplicateId,
                 ValidationSubject::Identity(identity.id),
+            ));
+        }
+    }
+    violations
+}
+
+fn validate_unique_scopes(scopes: &[Scope]) -> Vec<Violation> {
+    let mut seen = BTreeSet::new();
+    let mut violations = Vec::new();
+    for scope in scopes {
+        if !seen.insert(scope.id) {
+            violations.push(Violation::error(
+                ViolationCode::DuplicateId,
+                ValidationSubject::Scope(scope.id),
+            ));
+        }
+    }
+    violations
+}
+
+fn validate_unique_credentials(credentials: &[Credential]) -> Vec<Violation> {
+    let mut seen = BTreeSet::new();
+    let mut violations = Vec::new();
+    for credential in credentials {
+        if !seen.insert(credential.id) {
+            violations.push(Violation::error(
+                ViolationCode::DuplicateId,
+                ValidationSubject::Credential(credential.id),
+            ));
+        }
+    }
+    violations
+}
+
+fn validate_unique_trusts(trusts: &[Trust]) -> Vec<Violation> {
+    let mut seen = BTreeSet::new();
+    let mut violations = Vec::new();
+    for trust in trusts {
+        if !seen.insert(trust.id) {
+            violations.push(Violation::error(
+                ViolationCode::DuplicateId,
+                ValidationSubject::Trust(trust.id),
+            ));
+        }
+    }
+    violations
+}
+
+fn validate_unique_routes(routes: &[Route]) -> Vec<Violation> {
+    let mut seen = BTreeSet::new();
+    let mut violations = Vec::new();
+    for route in routes {
+        if !seen.insert(route.id) {
+            violations.push(Violation::error(
+                ViolationCode::DuplicateId,
+                ValidationSubject::Route(route.id),
+            ));
+        }
+    }
+    violations
+}
+
+fn validate_unique_policies(policies: &[Policy]) -> Vec<Violation> {
+    let mut seen = BTreeSet::new();
+    let mut violations = Vec::new();
+    for policy in policies {
+        if !seen.insert(policy.id) {
+            violations.push(Violation::error(
+                ViolationCode::DuplicateId,
+                ValidationSubject::Policy(policy.id),
             ));
         }
     }
@@ -647,6 +725,16 @@ fn validate_route_semantic(route: &Route, model: &SecurityModel) -> Vec<Violatio
             ValidationSubject::Route(route.id),
         ));
     }
+    if !model
+        .identities
+        .iter()
+        .any(|identity| identity.id == route.declared_by)
+    {
+        violations.push(Violation::error(
+            ViolationCode::MissingReference,
+            ValidationSubject::Route(route.id),
+        ));
+    }
     violations
 }
 
@@ -724,11 +812,11 @@ fn validate_trust_semantic(trust: &Trust, model: &SecurityModel) -> Vec<Violatio
         ));
         return violations;
     };
-    if !model
+    let grantor = model
         .identities
         .iter()
-        .any(|identity| identity.id == trust.granted_by)
-    {
+        .find(|identity| identity.id == trust.granted_by);
+    if grantor.is_none() {
         violations.push(Violation::error(
             ViolationCode::MissingReference,
             ValidationSubject::Trust(trust.id),
@@ -749,11 +837,14 @@ fn validate_trust_semantic(trust: &Trust, model: &SecurityModel) -> Vec<Violatio
             ValidationSubject::Trust(trust.id),
         ));
     }
-    if matches!(trust.basis, TrustBasis::SystemBootstrap) && identity.kind != IdentityKind::Root {
-        violations.push(Violation::error(
-            ViolationCode::TrustInvariant,
-            ValidationSubject::Trust(trust.id),
-        ));
+    if matches!(trust.basis, TrustBasis::SystemBootstrap) {
+        match grantor {
+            Some(grantor) if grantor.kind == IdentityKind::Root => {}
+            _ => violations.push(Violation::error(
+                ViolationCode::TrustInvariant,
+                ValidationSubject::Trust(trust.id),
+            )),
+        }
     }
     if let Some(bound_zone) = identity.bound_to_zone {
         if bound_zone != scope.zone_id {
@@ -762,6 +853,15 @@ fn validate_trust_semantic(trust: &Trust, model: &SecurityModel) -> Vec<Violatio
                 ValidationSubject::Trust(trust.id),
             ));
         }
+    }
+    if grantor.is_some()
+        && !is_root_bootstrap_self_grant(trust, identity, grantor)
+        && !grantor_has_zone_trust_authority(trust.granted_by, scope.zone_id, model)
+    {
+        violations.push(Violation::error(
+            ViolationCode::TrustGrantAuthorityMissing,
+            ValidationSubject::Trust(trust.id),
+        ));
     }
     violations
 }
@@ -847,6 +947,28 @@ fn validate_root_offline_credential(model: &SecurityModel) -> Vec<Violation> {
     violations
 }
 
+fn validate_unique_root_bootstrap_self_grant(model: &SecurityModel) -> Vec<Violation> {
+    let mut root_bootstraps = model.trusts.iter().filter(|trust| {
+        trust.identity_id == trust.granted_by
+            && trust.basis == TrustBasis::SystemBootstrap
+            && model
+                .identities
+                .iter()
+                .find(|identity| identity.id == trust.identity_id)
+                .map(|identity| identity.kind == IdentityKind::Root)
+                .unwrap_or(false)
+    });
+    let _first = root_bootstraps.next();
+    let mut violations = Vec::new();
+    for duplicate in root_bootstraps {
+        violations.push(Violation::error(
+            ViolationCode::TrustInvariant,
+            ValidationSubject::Trust(duplicate.id),
+        ));
+    }
+    violations
+}
+
 fn validate_routes_have_gates(model: &SecurityModel) -> Vec<Violation> {
     let mut violations = Vec::new();
     for route in &model.routes {
@@ -863,6 +985,41 @@ fn validate_routes_have_gates(model: &SecurityModel) -> Vec<Violation> {
         }
     }
     violations
+}
+
+fn is_root_bootstrap_self_grant(
+    trust: &Trust,
+    identity: &Identity,
+    grantor: Option<&Identity>,
+) -> bool {
+    trust.identity_id == trust.granted_by
+        && trust.basis == TrustBasis::SystemBootstrap
+        && identity.kind == IdentityKind::Root
+        && grantor
+            .map(|grantor| grantor.kind == IdentityKind::Root)
+            .unwrap_or(false)
+}
+
+fn grantor_has_zone_trust_authority(
+    grantor_id: IdentityId,
+    target_zone_id: ZoneId,
+    model: &SecurityModel,
+) -> bool {
+    model.trusts.iter().any(|trust| {
+        trust.identity_id == grantor_id
+            && trust.active
+            && model
+                .scopes
+                .iter()
+                .find(|scope| scope.id == trust.scope_id)
+                .map(|scope| {
+                    scope.zone_id == target_zone_id
+                        && scope.capabilities.iter().any(|capability| {
+                            matches!(capability, Capability::ZoneDeclare | Capability::ZoneModify)
+                        })
+                })
+                .unwrap_or(false)
+    })
 }
 
 fn hardness_range(mechanism: LayerMechanism) -> (LayerHardness, LayerHardness) {

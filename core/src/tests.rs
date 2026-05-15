@@ -1,10 +1,21 @@
+use alloc::{vec, vec::Vec};
+
 use crate::{
     composites::{ArtifactContract, BoundarySpec, SecurityModel},
-    enums::{FailMode, IsolationMechanism, SurfaceFacing, TrustLevel, ZoneKind},
-    id::{BoundaryId, SurfaceId, ZoneId},
-    scalars::{AbsolutePath, MediaType, NonEmptyVec, Port, SemVer, UtcTimestamp, ZonePurpose},
-    structs::{Boundary, BoundaryEnd, Surface, Zone},
-    validation::{validate_security_model, ViolationCode},
+    enums::{
+        Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, IdentityKind,
+        IsolationMechanism, SurfaceFacing, TrustBasis, TrustLevel, ZoneKind,
+    },
+    id::{BoundaryId, CredentialId, IdentityId, RouteId, ScopeId, SurfaceId, TrustId, ZoneId},
+    scalars::{
+        AbsolutePath, DisplayName, MediaType, NonEmptyVec, Port, SemVer, UtcTimestamp, ZonePurpose,
+    },
+    structs::{
+        Boundary, BoundaryEnd, Credential, CredentialBinding, CredentialLifecycle,
+        CredentialMaterial, DeclarationMetadata, Identity, Route, RouteEndpoints, Scope, Surface,
+        Trust, TrustGrant, TrustParties, Zone,
+    },
+    validation::{validate_security_model, ValidationSubject, Violation, ViolationCode},
 };
 
 fn zone_id(byte: u8) -> ZoneId {
@@ -19,8 +30,101 @@ fn surface_id(byte: u8) -> SurfaceId {
     SurfaceId::from_bytes([byte; 16])
 }
 
+fn route_id(byte: u8) -> RouteId {
+    RouteId::from_bytes([byte; 16])
+}
+
+fn identity_id(byte: u8) -> IdentityId {
+    IdentityId::from_bytes([byte; 16])
+}
+
+fn scope_id(byte: u8) -> ScopeId {
+    ScopeId::from_bytes([byte; 16])
+}
+
+fn credential_id(byte: u8) -> CredentialId {
+    CredentialId::from_bytes([byte; 16])
+}
+
+fn trust_id(byte: u8) -> TrustId {
+    TrustId::from_bytes([byte; 16])
+}
+
 fn timestamp() -> UtcTimestamp {
     UtcTimestamp::new("2026-05-15T00:00:00Z").unwrap()
+}
+
+fn empty_model() -> SecurityModel {
+    SecurityModel {
+        model_version: SemVer::new("0.1.0").unwrap(),
+        zones: Vec::new(),
+        boundary_specs: Vec::new(),
+        routes: Vec::new(),
+        policies: Vec::new(),
+        identities: Vec::new(),
+        scopes: Vec::new(),
+        credentials: Vec::new(),
+        trusts: Vec::new(),
+    }
+}
+
+fn zone(
+    byte: u8,
+    kind: ZoneKind,
+    trust_level: TrustLevel,
+    isolation: IsolationMechanism,
+    root: &str,
+) -> Zone {
+    Zone::new(
+        zone_id(byte),
+        kind,
+        ZonePurpose::new("test zone").unwrap(),
+        trust_level,
+        isolation,
+        NonEmptyVec::new(vec![AbsolutePath::new(root).unwrap()], "filesystem_roots").unwrap(),
+        timestamp(),
+    )
+    .unwrap()
+}
+
+fn boundary_spec(byte: u8, side_a: BoundaryEnd, side_b: BoundaryEnd) -> BoundarySpec {
+    let boundary = Boundary::new(boundary_id(byte), side_a, side_b).unwrap();
+    let surface_a = Surface {
+        id: surface_id(byte),
+        boundary_id: boundary.id,
+        facing: SurfaceFacing::A,
+        exposed_paths: Vec::new(),
+        exposed_listeners: Vec::new(),
+        exposed_capabilities: Vec::new(),
+    };
+    let surface_b = Surface {
+        id: surface_id(byte + 1),
+        boundary_id: boundary.id,
+        facing: SurfaceFacing::B,
+        exposed_paths: Vec::new(),
+        exposed_listeners: Vec::new(),
+        exposed_capabilities: Vec::new(),
+    };
+    BoundarySpec::new(boundary, Vec::new(), [surface_a, surface_b])
+}
+
+fn scope(id: ScopeId, zone_id: ZoneId, capability: Capability) -> Scope {
+    Scope {
+        id,
+        zone_id,
+        capabilities: NonEmptyVec::from_item(capability),
+        constraints: Vec::new(),
+    }
+}
+
+fn has_violation(
+    violations: &[Violation],
+    code: ViolationCode,
+    subject: ValidationSubject,
+) -> bool {
+    violations
+        .iter()
+        .any(|violation| violation.code == code && violation.subject == subject)
 }
 
 #[test]
@@ -115,6 +219,226 @@ fn model_validation_detects_overlapping_zone_roots() {
     assert!(violations
         .iter()
         .any(|violation| violation.code == ViolationCode::FilesystemRootOverlap));
+}
+
+#[test]
+fn model_validation_detects_duplicate_scope_ids() {
+    let dev_zone = zone(
+        1,
+        ZoneKind::Dev,
+        TrustLevel::Standard,
+        IsolationMechanism::UserAccount,
+        "/zones/dev",
+    );
+    let duplicate_id = scope_id(1);
+    let mut model = empty_model();
+    model.zones = vec![dev_zone.clone()];
+    model.scopes = vec![
+        scope(duplicate_id, dev_zone.id, Capability::FsRead),
+        scope(duplicate_id, dev_zone.id, Capability::FsWrite),
+    ];
+
+    let violations = validate_security_model(&model);
+
+    assert!(has_violation(
+        &violations,
+        ViolationCode::DuplicateId,
+        ValidationSubject::Scope(duplicate_id),
+    ));
+}
+
+#[test]
+fn model_validation_detects_missing_route_declarer() {
+    let dev_zone = zone(
+        1,
+        ZoneKind::Dev,
+        TrustLevel::Standard,
+        IsolationMechanism::UserAccount,
+        "/zones/dev",
+    );
+    let build_zone = zone(
+        2,
+        ZoneKind::Build,
+        TrustLevel::Low,
+        IsolationMechanism::Container,
+        "/zones/build",
+    );
+    let boundary = boundary_spec(
+        1,
+        BoundaryEnd::Zone(dev_zone.id),
+        BoundaryEnd::Zone(build_zone.id),
+    );
+    let route = Route::new(
+        route_id(1),
+        RouteEndpoints::new(
+            BoundaryEnd::Zone(dev_zone.id),
+            BoundaryEnd::Zone(build_zone.id),
+        )
+        .unwrap(),
+        boundary.boundary.id,
+        Cadence::Push,
+        true,
+        DeclarationMetadata {
+            declared_at: timestamp(),
+            declared_by: identity_id(99),
+        },
+    )
+    .unwrap();
+    let mut model = empty_model();
+    model.zones = vec![dev_zone, build_zone];
+    model.boundary_specs = vec![boundary];
+    model.routes = vec![route];
+
+    let violations = validate_security_model(&model);
+
+    assert!(has_violation(
+        &violations,
+        ViolationCode::MissingReference,
+        ValidationSubject::Route(route_id(1)),
+    ));
+}
+
+#[test]
+fn model_validation_detects_trust_grant_without_authority() {
+    let dev_zone = zone(
+        1,
+        ZoneKind::Dev,
+        TrustLevel::Standard,
+        IsolationMechanism::UserAccount,
+        "/zones/dev",
+    );
+    let admin = Identity::new(
+        identity_id(1),
+        IdentityKind::ZoneAdmin,
+        DisplayName::new("Dev admin").unwrap(),
+        Some(dev_zone.id),
+        false,
+        timestamp(),
+    )
+    .unwrap();
+    let service = Identity::new(
+        identity_id(2),
+        IdentityKind::Service,
+        DisplayName::new("Build service").unwrap(),
+        Some(dev_zone.id),
+        false,
+        timestamp(),
+    )
+    .unwrap();
+    let read_scope = scope(scope_id(1), dev_zone.id, Capability::FsRead);
+    let trust = Trust::new(
+        trust_id(1),
+        TrustParties {
+            identity_id: service.id,
+            scope_id: read_scope.id,
+            granted_by: admin.id,
+        },
+        TrustGrant {
+            basis: TrustBasis::RoleAssignment,
+            granted_at: timestamp(),
+            expires_at: None,
+            requires_credential: CredentialStrength::PrimarySoftware,
+            active: true,
+        },
+    )
+    .unwrap();
+    let mut model = empty_model();
+    model.zones = vec![dev_zone];
+    model.identities = vec![admin, service];
+    model.scopes = vec![read_scope];
+    model.trusts = vec![trust];
+
+    let violations = validate_security_model(&model);
+
+    assert!(has_violation(
+        &violations,
+        ViolationCode::TrustGrantAuthorityMissing,
+        ValidationSubject::Trust(trust_id(1)),
+    ));
+}
+
+#[test]
+fn model_validation_rejects_multiple_root_bootstrap_self_grants() {
+    let identity_zone = zone(
+        1,
+        ZoneKind::Identity,
+        TrustLevel::Critical,
+        IsolationMechanism::Physical,
+        "/zones/identity",
+    );
+    let root = Identity::new(
+        identity_id(1),
+        IdentityKind::Root,
+        DisplayName::new("Root").unwrap(),
+        None,
+        false,
+        timestamp(),
+    )
+    .unwrap();
+    let credential = Credential::new(
+        credential_id(1),
+        CredentialBinding {
+            identity_id: root.id,
+            stored_in: identity_zone.id,
+        },
+        CredentialMaterial {
+            mechanism: CredentialMechanism::PasswordOffline,
+            strength: CredentialStrength::PrimaryHardware,
+            fingerprint: None,
+        },
+        CredentialLifecycle {
+            expires_at: None,
+            rotated_at: timestamp(),
+        },
+    )
+    .unwrap();
+    let root_scope = scope(scope_id(1), identity_zone.id, Capability::ZoneDeclare);
+    let first_bootstrap = Trust::new(
+        trust_id(1),
+        TrustParties {
+            identity_id: root.id,
+            scope_id: root_scope.id,
+            granted_by: root.id,
+        },
+        TrustGrant {
+            basis: TrustBasis::SystemBootstrap,
+            granted_at: timestamp(),
+            expires_at: None,
+            requires_credential: CredentialStrength::PrimaryHardware,
+            active: true,
+        },
+    )
+    .unwrap();
+    let second_bootstrap = Trust::new(
+        trust_id(2),
+        TrustParties {
+            identity_id: root.id,
+            scope_id: root_scope.id,
+            granted_by: root.id,
+        },
+        TrustGrant {
+            basis: TrustBasis::SystemBootstrap,
+            granted_at: timestamp(),
+            expires_at: None,
+            requires_credential: CredentialStrength::PrimaryHardware,
+            active: true,
+        },
+    )
+    .unwrap();
+    let mut model = empty_model();
+    model.zones = vec![identity_zone];
+    model.identities = vec![root];
+    model.scopes = vec![root_scope];
+    model.credentials = vec![credential];
+    model.trusts = vec![first_bootstrap, second_bootstrap];
+
+    let violations = validate_security_model(&model);
+
+    assert!(has_violation(
+        &violations,
+        ViolationCode::TrustInvariant,
+        ValidationSubject::Trust(trust_id(2)),
+    ));
 }
 
 #[cfg(feature = "serde")]
