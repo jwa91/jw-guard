@@ -1,23 +1,24 @@
 use alloc::{vec, vec::Vec};
 
 use crate::{
-    composites::{ArtifactContract, BoundarySpec, SecurityModel},
+    composites::{ArtifactContract, BoundarySpec, Policy, SecurityModel, TrustRequirement},
     concept_feedback::{run_core_concept_feedback_loop, ConceptLayer},
     enums::{
-        Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, IdentityKind,
-        IsolationMechanism, SurfaceFacing, TrustBasis, TrustLevel, ZoneKind,
+        Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, GateVerdict,
+        IdentityKind, IsolationMechanism, LayerHardness, LayerMechanism, SurfaceFacing,
+        TrustBasis, TrustLevel, VerificationKind, ZoneKind,
     },
     id::{
-        ActorId, BoundaryId, CredentialId, EdgeId, EvaluationId, EvidenceSourceId, IdentityId,
-        ObservationId, PolicyId, ReferentId, RequirementId, RouteId, ScopeId, SurfaceId, TrustId,
-        ZoneId,
+        ActorId, BoundaryId, CredentialId, EdgeId, EvaluationId, EvidenceSourceId, GateId,
+        IdentityId, LayerId, ObservationId, PolicyId, ReferentId, RequirementId, RouteId, ScopeId,
+        SurfaceId, TrustId, ZoneId,
     },
     scalars::{
-        AbsolutePath, DisplayName, MediaType, NonEmptyString, NonEmptyVec, Port, SemVer,
-        UtcTimestamp, ZonePurpose,
+        AbsolutePath, DisplayName, GateSequence, MediaType, NonEmptyString, NonEmptyVec, Port,
+        SemVer, UtcTimestamp, ZonePurpose,
     },
     structs::{
-        Boundary, BoundaryEnd, Credential, CredentialBinding, CredentialLifecycle,
+        Boundary, BoundaryEnd, Credential, CredentialBinding, CredentialLifecycle, Gate, Layer,
         CredentialMaterial, DeclarationMetadata, Identity, Route, RouteEndpoints, Scope, Surface,
         Trust, TrustGrant, TrustParties, Zone,
     },
@@ -53,6 +54,14 @@ fn surface_id(byte: u8) -> SurfaceId {
 
 fn route_id(byte: u8) -> RouteId {
     RouteId::from_bytes([byte; 16])
+}
+
+fn layer_id(byte: u8) -> LayerId {
+    LayerId::from_bytes([byte; 16])
+}
+
+fn gate_id(byte: u8) -> GateId {
+    GateId::from_bytes([byte; 16])
 }
 
 fn identity_id(byte: u8) -> IdentityId {
@@ -362,6 +371,107 @@ fn model_validation_detects_missing_route_declarer() {
         ViolationCode::MissingReference,
         ValidationSubject::Route(route_id(1)),
     ));
+}
+
+#[test]
+fn model_validation_allows_non_airlock_signing_route_with_required_verification() {
+    let signing_zone = zone(
+        1,
+        ZoneKind::Signing,
+        TrustLevel::Critical,
+        IsolationMechanism::Physical,
+        "/zones/signing",
+    );
+    let release_zone = zone(
+        2,
+        ZoneKind::Release,
+        TrustLevel::Standard,
+        IsolationMechanism::UserAccount,
+        "/zones/release",
+    );
+    let boundary = boundary_spec(
+        1,
+        BoundaryEnd::Zone(signing_zone.id),
+        BoundaryEnd::Zone(release_zone.id),
+    );
+    let route = Route::new(
+        route_id(2),
+        RouteEndpoints::new(
+            BoundaryEnd::Zone(signing_zone.id),
+            BoundaryEnd::Zone(release_zone.id),
+        )
+        .unwrap(),
+        boundary.boundary.id,
+        Cadence::Push,
+        true,
+        DeclarationMetadata {
+            declared_at: timestamp(),
+            declared_by: identity_id(1),
+        },
+    )
+    .unwrap();
+    let gate = Gate {
+        id: gate_id(1),
+        route_id: route.id,
+        sequence: GateSequence::new(1).unwrap(),
+        required_verifications: NonEmptyVec::from_item(VerificationKind::SignatureValidity),
+        verdict: GateVerdict::Pending,
+    };
+    let policy = Policy {
+        id: PolicyId::from_bytes([1; 16]),
+        route_id: route.id,
+        contract: ArtifactContract::new(
+            NonEmptyVec::from_item(MediaType::new("application/octet-stream").unwrap()),
+            Vec::new(),
+            crate::composites::IntegrityRequirement::Hash,
+            None,
+        ),
+        gates: NonEmptyVec::from_item(gate),
+        required_trust: NonEmptyVec::from_item(TrustRequirement {
+            role: IdentityKind::Service,
+            minimum_credential: CredentialStrength::PrimarySoftware,
+            required_capabilities: NonEmptyVec::from_item(Capability::RouteExecuteTransfer),
+        }),
+        status: crate::enums::PolicyStatus::Active,
+        version: SemVer::new("1.0.0").unwrap(),
+        declared_at: timestamp(),
+        declared_by: identity_id(1),
+    };
+    let mut secured_boundary = boundary.clone();
+    secured_boundary.layers.push(Layer {
+        id: layer_id(1),
+        boundary_id: boundary.boundary.id,
+        mechanism: LayerMechanism::Hypervisor,
+        hardness: LayerHardness::H4,
+        fail_mode: FailMode::FailClosed,
+        enforced: true,
+        verified_at: Some(timestamp()),
+    });
+    let declarer = Identity::new(
+        identity_id(1),
+        IdentityKind::Service,
+        DisplayName::new("Route declarer").unwrap(),
+        Some(signing_zone.id),
+        false,
+        timestamp(),
+    )
+    .unwrap();
+
+    let mut model = empty_model();
+    model.zones = vec![signing_zone, release_zone];
+    model.boundary_specs = vec![secured_boundary];
+    model.routes = vec![route];
+    model.policies = vec![policy];
+    model.identities = vec![declarer];
+
+    let violations = validate_security_model(&model);
+
+    assert!(!has_violation(
+        &violations,
+        ViolationCode::GateMissingVerification,
+        ValidationSubject::Gate(gate_id(1)),
+    ));
+    assert!(violations.is_empty());
 }
 
 #[test]
