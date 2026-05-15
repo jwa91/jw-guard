@@ -191,21 +191,48 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                 }
             }
         }
-        if let MembershipPredicateDeclaration::EdgeTo { to, .. } = &scope.predicate {
-            let referent = library
+        if let MembershipPredicateDeclaration::EdgeTo { edge_sort, to } = &scope.predicate {
+            let to_referent_exists = library
                 .referents
                 .iter()
-                .find(|candidate| candidate.id == *to);
-            let Some(referent) = referent else {
+                .any(|candidate| candidate.id == *to);
+            if !to_referent_exists {
                 violations.push(TheoryViolation::new(
                     TheoryViolationCode::MissingReference,
                     TheorySubject::Scope(scope.id),
                 ));
                 continue;
-            };
-            if referent.sort != scope.referent_sort {
+            }
+
+            let mut has_matching_edge = false;
+            for edge in library
+                .edges
+                .iter()
+                .filter(|edge| edge.sort == *edge_sort && edge.to == *to)
+            {
+                has_matching_edge = true;
+                let from_referent = library
+                    .referents
+                    .iter()
+                    .find(|candidate| candidate.id == edge.from);
+                let Some(from_referent) = from_referent else {
+                    violations.push(TheoryViolation::new(
+                        TheoryViolationCode::MissingReference,
+                        TheorySubject::Scope(scope.id),
+                    ));
+                    continue;
+                };
+                if from_referent.sort != scope.referent_sort {
+                    violations.push(TheoryViolation::new(
+                        TheoryViolationCode::ScopeSortMismatch,
+                        TheorySubject::Scope(scope.id),
+                    ));
+                }
+            }
+
+            if !has_matching_edge {
                 violations.push(TheoryViolation::new(
-                    TheoryViolationCode::ScopeSortMismatch,
+                    TheoryViolationCode::MissingReference,
                     TheorySubject::Scope(scope.id),
                 ));
             }

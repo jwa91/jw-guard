@@ -789,3 +789,70 @@ fn core_theory_validation_rejects_edge_to_predicate_with_missing_referent() {
             && violation.subject == TheorySubject::Scope(library.scopes[0].id)
     }));
 }
+
+#[test]
+fn core_theory_validation_accepts_edge_to_with_typed_source_edges() {
+    let mut library = sample_core_theory_library();
+    let actor_referent = ReferentId::from_bytes([87u8; 16]);
+    let target_referent = library.referents[1].id;
+    library.referents.push(ReferentDeclaration {
+        id: actor_referent,
+        sort: ReferentSort::Actor,
+    });
+    library.edges.push(
+        EdgeDeclaration::new(
+            EdgeId::from_bytes([86u8; 16]),
+            EdgeSort::DependsOn,
+            actor_referent,
+            target_referent,
+        )
+        .unwrap(),
+    );
+    library.scopes[0].referent_sort = ReferentSort::Actor;
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+        edge_sort: EdgeSort::DependsOn,
+        to: target_referent,
+    };
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(!violations.iter().any(|violation| {
+        violation.subject == TheorySubject::Scope(library.scopes[0].id)
+            && (violation.code == TheoryViolationCode::ScopeSortMismatch
+                || violation.code == TheoryViolationCode::MissingReference)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_edge_to_with_mismatched_source_sort() {
+    let mut library = sample_core_theory_library();
+    library.scopes[0].referent_sort = ReferentSort::Actor;
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+        edge_sort: EdgeSort::CrossesBoundary,
+        to: library.referents[1].id,
+    };
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ScopeSortMismatch
+            && violation.subject == TheorySubject::Scope(library.scopes[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_edge_to_without_matching_edge_relation() {
+    let mut library = sample_core_theory_library();
+    library.scopes[0].referent_sort = ReferentSort::Boundary;
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+        edge_sort: EdgeSort::DependsOn,
+        to: library.referents[1].id,
+    };
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::MissingReference
+            && violation.subject == TheorySubject::Scope(library.scopes[0].id)
+    }));
+}
