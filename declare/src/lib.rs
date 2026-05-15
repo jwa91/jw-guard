@@ -3,6 +3,7 @@
 
 extern crate alloc;
 
+pub mod concretise;
 pub mod declaration;
 pub mod error;
 pub mod name;
@@ -10,6 +11,7 @@ pub mod requirement;
 pub mod scope;
 pub mod validation;
 
+pub use concretise::*;
 pub use declaration::*;
 pub use error::*;
 pub use name::*;

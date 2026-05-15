@@ -1,17 +1,22 @@
 use alloc::{vec, vec::Vec};
 
 use jw_guard_core::{
+    composites::{ArtifactContract, TrustRequirement},
     enums::{
-        Cadence, Capability, FailMode, IsolationMechanism, LayerHardness, LayerMechanism,
-        TrustLevel, ZoneKind,
+        Cadence, Capability, CredentialStrength, FailMode, IdentityKind, IsolationMechanism,
+        LayerHardness, LayerMechanism, VerificationKind, TrustLevel, ZoneKind,
     },
-    scalars::{AbsolutePath, NonEmptyVec, SemVer, ZonePurpose},
+    scalars::{AbsolutePath, GateSequence, MediaType, NonEmptyVec, SemVer, UtcTimestamp, ZonePurpose},
 };
 
 use crate::{
+    concretise::{
+        build_canonical_model, derive_deterministic_id, normalize_security_declaration,
+        run_concretisation_loop, ConcretisationStage, DeterministicIdKind,
+    },
     declaration::{
-        BoundaryDeclaration, BoundaryEndRef, LayerRequirement, RouteDeclaration, ScopeDeclaration,
-        SecurityDeclaration, ZoneDeclaration,
+        BoundaryDeclaration, BoundaryEndRef, GateRequirement, LayerRequirement, RouteDeclaration,
+        RoutePolicyDeclaration, ScopeDeclaration, SecurityDeclaration, ZoneDeclaration,
     },
     name::DeclarationName,
     requirement::{PresenceRequirement, StrengthRequirement},
@@ -334,4 +339,125 @@ fn declaration_validation_does_not_imply_airlock_for_signing_routes() {
     let violations = validate_security_declaration(&declaration);
 
     assert!(violations.is_empty());
+}
+
+fn declaration_with_policy() -> SecurityDeclaration {
+    let mut declaration = declaration();
+    declaration.zones = vec![
+        zone(
+            "dev",
+            ZoneKind::Dev,
+            TrustLevel::Standard,
+            IsolationMechanism::UserAccount,
+            "/zones/dev",
+        ),
+        zone(
+            "build",
+            ZoneKind::Build,
+            TrustLevel::Low,
+            IsolationMechanism::Container,
+            "/zones/build",
+        ),
+    ];
+    declaration.boundaries = vec![boundary(
+        "dev-build",
+        BoundaryEndRef::Zone(name("dev")),
+        BoundaryEndRef::Zone(name("build")),
+    )];
+    declaration.routes = vec![route(
+        "source",
+        BoundaryEndRef::Zone(name("dev")),
+        BoundaryEndRef::Zone(name("build")),
+        "dev-build",
+    )];
+    declaration.scopes = vec![ScopeDeclaration {
+        name: name("source"),
+        kind: ScopeKind::ArtifactFlow,
+        target: ScopeTarget::Route(name("source")),
+        required_capabilities: NonEmptyVec::from_item(Capability::RouteExecuteTransfer),
+        forbidden_capabilities: vec![Capability::RouteApproveTransfer],
+    }];
+    declaration.route_policies = vec![RoutePolicyDeclaration {
+        name: name("source-policy"),
+        route: name("source"),
+        contract: ArtifactContract::new(
+            NonEmptyVec::from_item(MediaType::new("application/json").unwrap()),
+            Vec::new(),
+            jw_guard_core::composites::IntegrityRequirement::Hash,
+            None,
+        ),
+        gates: NonEmptyVec::from_item(GateRequirement {
+            sequence: GateSequence::new(1).unwrap(),
+            required_verifications: NonEmptyVec::from_item(VerificationKind::HashIntegrity),
+        }),
+        required_trust: NonEmptyVec::from_item(TrustRequirement {
+            role: IdentityKind::Service,
+            minimum_credential: CredentialStrength::PrimarySoftware,
+            required_capabilities: NonEmptyVec::from_item(Capability::RouteExecuteTransfer),
+        }),
+        declared_at: UtcTimestamp::new("2026-05-15T00:00:00Z").unwrap(),
+    }];
+    declaration
+}
+
+#[test]
+fn deterministic_id_derivation_is_repeatable() {
+    let schema = SemVer::new("1.0.0").unwrap();
+    let path = "boundary/dev-build";
+    let left = derive_deterministic_id(DeterministicIdKind::Boundary, &schema, path);
+    let right = derive_deterministic_id(DeterministicIdKind::Boundary, &schema, path);
+    assert_eq!(left, right);
+}
+
+#[test]
+fn normalization_is_permutation_invariant() {
+    let left = declaration_with_policy();
+    let mut right = declaration_with_policy();
+    right.zones.reverse();
+    right.boundaries.reverse();
+    right.scopes.reverse();
+    right.routes.reverse();
+    right.route_policies.reverse();
+
+    let normalized_left = normalize_security_declaration(&left);
+    let normalized_right = normalize_security_declaration(&right);
+
+    assert_eq!(normalized_left, normalized_right);
+}
+
+#[test]
+fn concretisation_loop_passes_on_coherent_declaration() {
+    let declaration = declaration_with_policy();
+    let report = run_concretisation_loop(&declaration);
+    assert!(report.passed(), "{report:#?}");
+    assert_eq!(report.halted_at, None);
+    assert_eq!(
+        report
+            .stages
+            .iter()
+            .filter(|stage| stage.passed)
+            .count(),
+        6
+    );
+    assert!(report
+        .stages
+        .iter()
+        .any(|stage| stage.stage == ConcretisationStage::ValidateCanonicalTheoryGraph));
+}
+
+#[test]
+fn canonical_model_is_stable_across_input_permutations() {
+    let left = declaration_with_policy();
+    let mut right = declaration_with_policy();
+    right.zones.reverse();
+    right.boundaries.reverse();
+    right.scopes.reverse();
+    right.routes.reverse();
+    right.route_policies.reverse();
+
+    let canonical_left = build_canonical_model(normalize_security_declaration(&left));
+    let canonical_right = build_canonical_model(normalize_security_declaration(&right));
+
+    assert_eq!(canonical_left.paths, canonical_right.paths);
+    assert_eq!(canonical_left.theory, canonical_right.theory);
 }
