@@ -132,6 +132,26 @@ pub enum LayerMechanism {
     PhysicalSeparation,
 }
 
+impl LayerMechanism {
+    /// Returns the inclusive hardness range this mechanism can represent.
+    pub const fn hardness_range(self) -> (LayerHardness, LayerHardness) {
+        match self {
+            Self::PacketFilter | Self::EgressProxy => (LayerHardness::H1, LayerHardness::H3),
+            Self::MandatoryAccessControl
+            | Self::CapabilityRestriction
+            | Self::CodeSigningEnforcement
+            | Self::FilesystemAcl
+            | Self::VolumeEncryption
+            | Self::IntegrityProtection => (LayerHardness::H2, LayerHardness::H3),
+            Self::UserSeparation | Self::PrivilegeBoundary | Self::ConsentGate => {
+                (LayerHardness::H2, LayerHardness::H2)
+            }
+            Self::Hypervisor | Self::NamespaceIsolation => (LayerHardness::H3, LayerHardness::H4),
+            Self::PhysicalSeparation => (LayerHardness::H5, LayerHardness::H5),
+        }
+    }
+}
+
 /// Protection hardness ordered from soft application controls to physical separation.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

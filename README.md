@@ -6,7 +6,8 @@ Security policy type system for supply-chain hardening.
 
 ```
 jw-guard (workspace)
-├── core/       — Atomic type system (pure, sync, zero deps)
+├── core/       — Atomic and canonical model types (pure, sync, zero deps)
+├── declare/    — First-principles declaration IR and declaration validation
 └── cli/        — Thin binary entrypoint; adapter/enforcement commands reserved
 ```
 
@@ -20,18 +21,26 @@ Then help me structure this project in a smart way that enables me to build the 
 
 ## Current Rust Layering
 
-The Rust implementation follows `atomic-security-type-system.md` as the
-authority:
+The strict concept baseline lives in `docs/concepts/`. The Rust implementation
+uses `atomic-security-type-system.md` and the drafts as design input, but those
+drafts are not binding when they conflict with the concepts or current Rust
+layer boundaries:
 
 1. `core/src/id.rs` — branded entity IDs over `[u8; 16]`.
 2. `core/src/scalars.rs` — validated scalar foundations and non-empty sequences.
 3. `core/src/enums.rs` — closed vocabularies with ordered trust, hardness, and credential strength.
 4. `core/src/structs.rs` — the ten atomic security types.
-5. `core/src/composites.rs` — fundamental objects plus the next workflow, orchestration, policy-config, edge, and governance layers.
+5. `core/src/composites.rs` — canonical aggregates and fundamental objects.
 6. `core/src/validation.rs` — pure validation functions returning typed violations.
+7. `declare/src/*` — symbolic declaration names, requirement operators, scope kinds, declaration objects, and declaration-local validation.
 
 The core crate supports `no_std` with `alloc`; `serde` is available only behind
 the optional `serde` feature.
+
+`jw-guard-declare` is intentionally not a serializer for `SecurityModel`. It is
+the normative layer for policy intent: names instead of core IDs, minimum
+requirements instead of observations, and scope kinds that later mappers can use
+to compare real-world inputs against the declared architecture.
 
 ## Development Toolchain
 

@@ -6,9 +6,9 @@ use crate::{
         TrustChain,
     },
     enums::{
-        Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, GateVerdict,
-        IdentityKind, IsolationMechanism, LayerHardness, LayerMechanism, PolicyStatus,
-        SurfaceFacing, TrustBasis, TrustLevel, VerificationKind, ZoneKind,
+        Capability, CredentialMechanism, CredentialStrength, FailMode, GateVerdict, IdentityKind,
+        IsolationMechanism, LayerHardness, LayerMechanism, PolicyStatus, SurfaceFacing, TrustBasis,
+        TrustLevel, VerificationKind, ZoneKind,
     },
     id::{BoundaryId, CredentialId, IdentityId, PolicyId, RouteId, ScopeId, TrustId, ZoneId},
     scalars::AbsolutePath,
@@ -63,8 +63,6 @@ pub enum ViolationCode {
     BoundarySpecUnprotected,
     /// Route endpoints do not match the referenced boundary.
     RouteBoundaryMismatch,
-    /// Signing route is not airlock cadence.
-    SigningRouteNotAirlock,
     /// Route has no gate in any policy.
     RouteWithoutGate,
     /// Gate is missing required verification.
@@ -717,14 +715,6 @@ fn validate_route_semantic(route: &Route, model: &SecurityModel) -> Vec<Violatio
             ValidationSubject::Route(route.id),
         ));
     }
-    if (end_is_signing(route.from_zone, model) || end_is_signing(route.to_zone, model))
-        && route.cadence != Cadence::Airlock
-    {
-        violations.push(Violation::error(
-            ViolationCode::SigningRouteNotAirlock,
-            ValidationSubject::Route(route.id),
-        ));
-    }
     if !model
         .identities
         .iter()
@@ -1023,24 +1013,7 @@ fn grantor_has_zone_trust_authority(
 }
 
 fn hardness_range(mechanism: LayerMechanism) -> (LayerHardness, LayerHardness) {
-    match mechanism {
-        LayerMechanism::PacketFilter | LayerMechanism::EgressProxy => {
-            (LayerHardness::H1, LayerHardness::H3)
-        }
-        LayerMechanism::MandatoryAccessControl
-        | LayerMechanism::CapabilityRestriction
-        | LayerMechanism::CodeSigningEnforcement
-        | LayerMechanism::FilesystemAcl
-        | LayerMechanism::VolumeEncryption
-        | LayerMechanism::IntegrityProtection => (LayerHardness::H2, LayerHardness::H3),
-        LayerMechanism::UserSeparation
-        | LayerMechanism::PrivilegeBoundary
-        | LayerMechanism::ConsentGate => (LayerHardness::H2, LayerHardness::H2),
-        LayerMechanism::Hypervisor | LayerMechanism::NamespaceIsolation => {
-            (LayerHardness::H3, LayerHardness::H4)
-        }
-        LayerMechanism::PhysicalSeparation => (LayerHardness::H5, LayerHardness::H5),
-    }
+    mechanism.hardness_range()
 }
 
 fn paths_overlap(left: &AbsolutePath, right: &AbsolutePath) -> bool {
@@ -1082,15 +1055,6 @@ fn boundary_touches_high_trust(boundary: &Boundary, model: &SecurityModel) -> bo
             .map(|zone| matches!(zone.trust_level, TrustLevel::High | TrustLevel::Critical))
             .unwrap_or(false)
     })
-}
-
-fn end_is_signing(end: BoundaryEnd, model: &SecurityModel) -> bool {
-    let BoundaryEnd::Zone(id) = end else {
-        return false;
-    };
-    find_zone(model, id)
-        .map(|zone| zone.kind == ZoneKind::Signing)
-        .unwrap_or(false)
 }
 
 fn route_enters_kind(route: &Route, kind: ZoneKind, model: &SecurityModel) -> bool {
