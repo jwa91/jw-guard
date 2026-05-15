@@ -18,6 +18,9 @@ Read in order:
 5. `04-loop-control.md` - deterministic control-loop gate for Goal/State/Loop/Mayrun.
 6. `05-l1-type-definition.md` - deterministic Layer-1 type definition over L0 atoms.
 7. `06-l2-typegate.md` - deterministic Layer-2 type-theory gate for composition.
+8. `07-l3-type-definition.md` - provisional Layer-3 graph/reference semantics candidate (pending abstraction strategy).
+9. `08-l4-type-definition.md` - provisional Layer-4 normative semantics candidate (pending semantics decision).
+10. `09-type-axis-detectability.md` - locked L1-L2 detection and foundational deconstructability helper.
 
 ## Core Principle
 
