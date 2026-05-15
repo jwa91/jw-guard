@@ -1,6 +1,20 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 
-pub mod l0;
+extern crate alloc;
 
+pub mod composites;
+pub mod enums;
+pub mod id;
+pub mod l0;
+pub mod scalars;
+pub mod structs;
+pub mod validation;
+
+pub use composites::*;
+pub use enums::*;
+pub use id::*;
 pub use l0::*;
+pub use scalars::*;
+pub use structs::*;
+pub use validation::*;
