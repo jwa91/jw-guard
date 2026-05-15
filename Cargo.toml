@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "declare", "cli"]
+members = ["core"]
 resolver = "2"
 
 [workspace.package]
