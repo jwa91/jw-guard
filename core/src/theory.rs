@@ -302,11 +302,20 @@ pub struct EvaluationContextDeclaration {
 /// Typed membership predicate declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EdgeToPredicateDeclaration {
+    pub source_sort: ReferentSort,
+    pub edge_sort: EdgeSort,
+    pub to: ReferentId,
+}
+
+/// Typed membership predicate declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "kebab-case", tag = "kind"))]
 pub enum MembershipPredicateDeclaration {
     All,
     ReferentIds { ids: NonEmptyVec<ReferentId> },
-    EdgeTo { edge_sort: EdgeSort, to: ReferentId },
+    EdgeTo(EdgeToPredicateDeclaration),
 }
 
 /// Typed scope declaration.
@@ -317,6 +326,43 @@ pub struct TypedScopeDeclaration {
     pub referent_sort: ReferentSort,
     pub context: EvaluationContextDeclaration,
     pub predicate: MembershipPredicateDeclaration,
+}
+
+impl TypedScopeDeclaration {
+    pub fn new(
+        id: ScopeId,
+        referent_sort: ReferentSort,
+        context: EvaluationContextDeclaration,
+        predicate: MembershipPredicateDeclaration,
+    ) -> GuardResult<Self> {
+        if let MembershipPredicateDeclaration::EdgeTo(edge_to) = &predicate {
+            if edge_to.source_sort != referent_sort {
+                return Err(GuardError::Invariant {
+                    field: "typed_scope_declaration.edge_to_source_sort",
+                });
+            }
+        }
+
+        Ok(Self {
+            id,
+            referent_sort,
+            context,
+            predicate,
+        })
+    }
+
+    pub fn edge_to(
+        id: ScopeId,
+        context: EvaluationContextDeclaration,
+        edge_to: EdgeToPredicateDeclaration,
+    ) -> Self {
+        Self {
+            id,
+            referent_sort: edge_to.source_sort.clone(),
+            context,
+            predicate: MembershipPredicateDeclaration::EdgeTo(edge_to),
+        }
+    }
 }
 
 /// Normative requirement declaration.

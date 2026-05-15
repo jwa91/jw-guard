@@ -191,11 +191,11 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                 }
             }
         }
-        if let MembershipPredicateDeclaration::EdgeTo { edge_sort, to } = &scope.predicate {
+        if let MembershipPredicateDeclaration::EdgeTo(edge_to) = &scope.predicate {
             let to_referent_exists = library
                 .referents
                 .iter()
-                .any(|candidate| candidate.id == *to);
+                .any(|candidate| candidate.id == edge_to.to);
             if !to_referent_exists {
                 violations.push(TheoryViolation::new(
                     TheoryViolationCode::MissingReference,
@@ -208,7 +208,7 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
             for edge in library
                 .edges
                 .iter()
-                .filter(|edge| edge.sort == *edge_sort && edge.to == *to)
+                .filter(|edge| edge.sort == edge_to.edge_sort && edge.to == edge_to.to)
             {
                 has_matching_edge = true;
                 let from_referent = library
@@ -222,7 +222,7 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                     ));
                     continue;
                 };
-                if from_referent.sort != scope.referent_sort {
+                if from_referent.sort != edge_to.source_sort {
                     violations.push(TheoryViolation::new(
                         TheoryViolationCode::ScopeSortMismatch,
                         TheorySubject::Scope(scope.id),

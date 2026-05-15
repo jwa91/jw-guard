@@ -24,8 +24,8 @@ use crate::{
     theory::{
         ActorDeclaration, ActorRole, BoundaryDeclaration, Edge, EdgeDeclaration, EdgeSort,
         EvaluationContextDeclaration, EvaluationDeclaration, EvaluationResult,
-        EvidenceBasis, EvidenceItem, EvidenceSourceDeclaration, MembershipPredicateDeclaration,
-        ModelDeclaration,
+        EvidenceBasis, EvidenceItem, EvidenceSourceDeclaration, EdgeToPredicateDeclaration,
+        MembershipPredicateDeclaration, ModelDeclaration,
         ObservationDeclaration, PolicyDeclaration, PresenceOperator, ReferentDeclaration,
         ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, Referent,
         SideDeclaration, SideLabel, SurfaceDeclaration, TypedScopeDeclaration, TypedValue,
@@ -777,10 +777,11 @@ fn core_theory_validation_rejects_scope_context_version_mismatch() {
 #[test]
 fn core_theory_validation_rejects_edge_to_predicate_with_missing_referent() {
     let mut library = sample_core_theory_library();
-    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo(EdgeToPredicateDeclaration {
+        source_sort: library.scopes[0].referent_sort.clone(),
         edge_sort: EdgeSort::CrossesBoundary,
         to: ReferentId::from_bytes([88u8; 16]),
-    };
+    });
 
     let violations = validate_core_theory_library(&library);
 
@@ -809,10 +810,11 @@ fn core_theory_validation_accepts_edge_to_with_typed_source_edges() {
         .unwrap(),
     );
     library.scopes[0].referent_sort = ReferentSort::Actor;
-    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo(EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::Actor,
         edge_sort: EdgeSort::DependsOn,
         to: target_referent,
-    };
+    });
 
     let violations = validate_core_theory_library(&library);
 
@@ -827,10 +829,11 @@ fn core_theory_validation_accepts_edge_to_with_typed_source_edges() {
 fn core_theory_validation_rejects_edge_to_with_mismatched_source_sort() {
     let mut library = sample_core_theory_library();
     library.scopes[0].referent_sort = ReferentSort::Actor;
-    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo(EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::Actor,
         edge_sort: EdgeSort::CrossesBoundary,
         to: library.referents[1].id,
-    };
+    });
 
     let violations = validate_core_theory_library(&library);
 
@@ -844,10 +847,11 @@ fn core_theory_validation_rejects_edge_to_with_mismatched_source_sort() {
 fn core_theory_validation_rejects_edge_to_without_matching_edge_relation() {
     let mut library = sample_core_theory_library();
     library.scopes[0].referent_sort = ReferentSort::Boundary;
-    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo(EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::Boundary,
         edge_sort: EdgeSort::DependsOn,
         to: library.referents[1].id,
-    };
+    });
 
     let violations = validate_core_theory_library(&library);
 
@@ -855,4 +859,56 @@ fn core_theory_validation_rejects_edge_to_without_matching_edge_relation() {
         violation.code == TheoryViolationCode::MissingReference
             && violation.subject == TheorySubject::Scope(library.scopes[0].id)
     }));
+}
+
+#[test]
+fn typed_scope_new_rejects_edge_to_source_sort_mismatch() {
+    let scope_id = ScopeId::from_bytes([91u8; 16]);
+    let edge_to = EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::Actor,
+        edge_sort: EdgeSort::DependsOn,
+        to: ReferentId::from_bytes([92u8; 16]),
+    };
+
+    let result = TypedScopeDeclaration::new(
+        scope_id,
+        ReferentSort::Boundary,
+        EvaluationContextDeclaration {
+            model_version: SemVer::new("1.0.0").unwrap(),
+            namespace: None,
+            boundary: None,
+            actor_authority: None,
+            snapshot_at: None,
+            evidence_source: None,
+        },
+        MembershipPredicateDeclaration::EdgeTo(edge_to),
+    );
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn typed_scope_edge_to_constructor_uses_edge_to_source_sort() {
+    let scope_id = ScopeId::from_bytes([93u8; 16]);
+    let edge_to = EdgeToPredicateDeclaration {
+        source_sort: ReferentSort::ProcessEvent,
+        edge_sort: EdgeSort::LogsTo,
+        to: ReferentId::from_bytes([94u8; 16]),
+    };
+
+    let scope = TypedScopeDeclaration::edge_to(
+        scope_id,
+        EvaluationContextDeclaration {
+            model_version: SemVer::new("1.0.0").unwrap(),
+            namespace: None,
+            boundary: None,
+            actor_authority: None,
+            snapshot_at: None,
+            evidence_source: None,
+        },
+        edge_to.clone(),
+    );
+
+    assert_eq!(scope.referent_sort, edge_to.source_sort);
+    assert_eq!(scope.predicate, MembershipPredicateDeclaration::EdgeTo(edge_to));
 }
