@@ -45,6 +45,19 @@ Use it to preserve strictness and avoid semantic drift.
 - Using boolean pass/fail as the only evaluation semantics in core.
 - Adding convenience defaults that alter normative meaning.
 - Mixing declaration intent with runtime observation or enforcement logic.
+- Hard-coding policy vocabulary/allowed values in shared language layers too early.
+
+## YAML Policy Boundary Rule
+
+- YAML adapters may adapt YAML syntax/shape only; they must not invent policy posture.
+- Policy lossiness and boundary cuts are declarer-owned decisions and must be explicit.
+- Preferred sequencing for policy authoring evolution:
+  1) template tagging
+  2) declarer-defined allowed value sets
+  3) typed value bindings
+  4) schema hardening from declared constraints
+- If a schema encodes domain opinions before this sequence is explicit, treat it as
+  reference-only work and do not merge into mainline.
 
 ## Required Style For Core Changes
 
