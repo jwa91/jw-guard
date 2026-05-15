@@ -17,6 +17,7 @@ Read in order:
    model referents and how observations are compared without hidden judgment.
 5. `04-loop-control.md` - deterministic control-loop gate for Goal/State/Loop/Mayrun.
 6. `05-l1-type-definition.md` - deterministic Layer-1 type definition over L0 atoms.
+7. `06-l2-typegate.md` - deterministic Layer-2 type-theory gate for composition.
 
 ## Core Principle
 
