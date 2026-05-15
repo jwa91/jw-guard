@@ -270,7 +270,7 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                 TheorySubject::Evaluation(evaluation.id),
             ));
         }
-        for observation in evaluation.evidence_basis.as_slice() {
+        for observation in evaluation.evidence_basis.references.as_slice() {
             if !library
                 .observations
                 .iter()

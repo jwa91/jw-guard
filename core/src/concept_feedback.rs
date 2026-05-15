@@ -9,7 +9,7 @@ use crate::{
     structs::{Boundary, BoundaryEnd, RouteEndpoints},
     theory::{
         ActorDeclaration, ActorRole, BoundaryDeclaration, EdgeDeclaration, EdgeSort,
-        EvaluationContextDeclaration, EvaluationDeclaration, EvaluationResult,
+        EvaluationContextDeclaration, EvaluationDeclaration, EvaluationResult, EvidenceBasis,
         EvidenceSourceDeclaration, MembershipPredicateDeclaration, ModelDeclaration,
         ObservationDeclaration, PolicyDeclaration, PresenceOperator, ReferentDeclaration,
         ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, SideDeclaration,
@@ -420,14 +420,15 @@ fn evaluate_evidence_atoms() -> LayerFeedback {
             .expect("valid timestamp"),
         claim: TypedValue::Bool(true),
     };
-    let evidence_basis = NonEmptyVec::from_item(observation.id);
+    let evidence_basis =
+        EvidenceBasis::from_references(NonEmptyVec::from_item(observation.id)).expect("non-empty");
     let evaluation = EvaluationDeclaration {
         id: EvaluationId::from_bytes([33u8; 16]),
         policy: PolicyId::from_bytes([22u8; 16]),
         evidence_basis,
         result: EvaluationResult::Unknown,
     };
-    if evaluation.evidence_basis.is_empty() || source.id != observation.source {
+    if evaluation.evidence_basis.references.as_slice().is_empty() || source.id != observation.source {
         findings.push(AlignmentFinding::error(
             "EvidenceAtoms",
             "evidence atoms failed to produce deterministic evaluation declaration",

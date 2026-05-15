@@ -1,3 +1,5 @@
+use alloc::{collections::BTreeSet, vec::Vec};
+
 use crate::{
     error::{GuardError, GuardResult},
     id::{
@@ -175,13 +177,16 @@ pub struct ActorDeclaration {
     pub role: ActorRole,
 }
 
-/// Abstract model referent declaration.
+/// Foundational typed referent handle.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ReferentDeclaration {
+pub struct Referent {
     pub id: ReferentId,
     pub sort: ReferentSort,
 }
+
+/// Backward-compatible declaration alias for typed referents.
+pub type ReferentDeclaration = Referent;
 
 /// Boundary side marker.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -258,17 +263,17 @@ impl BoundaryDeclaration {
     }
 }
 
-/// Typed edge declaration between two referents.
+/// Foundational typed relation between referents.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct EdgeDeclaration {
+pub struct Edge {
     pub id: EdgeId,
     pub sort: EdgeSort,
     pub from: ReferentId,
     pub to: ReferentId,
 }
 
-impl EdgeDeclaration {
+impl Edge {
     pub fn new(id: EdgeId, sort: EdgeSort, from: ReferentId, to: ReferentId) -> GuardResult<Self> {
         if from == to {
             return Err(GuardError::Invariant {
@@ -278,6 +283,9 @@ impl EdgeDeclaration {
         Ok(Self { id, sort, from, to })
     }
 }
+
+/// Backward-compatible declaration alias for typed edges.
+pub type EdgeDeclaration = Edge;
 
 /// Deterministic context used to construct scope carriers.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -367,16 +375,52 @@ pub struct EvidenceSourceDeclaration {
     pub trust_assumption: NonEmptyString,
 }
 
-/// Observation declaration mapped from evidence.
+/// Provenance-carrying evidence atom.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ObservationDeclaration {
+pub struct EvidenceItem {
     pub id: ObservationId,
     pub source: EvidenceSourceId,
     pub observed_referent: Option<ReferentId>,
     pub observed_sort: ReferentSort,
     pub at: UtcTimestamp,
     pub claim: TypedValue,
+}
+
+/// Backward-compatible declaration alias for evidence observations.
+pub type ObservationDeclaration = EvidenceItem;
+
+/// Explicit non-empty basis for evaluation evidence and assumptions.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct EvidenceBasis {
+    pub references: NonEmptyVec<ObservationId>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub assumptions: Vec<NonEmptyString>,
+}
+
+impl EvidenceBasis {
+    pub fn new(
+        references: NonEmptyVec<ObservationId>,
+        assumptions: Vec<NonEmptyString>,
+    ) -> GuardResult<Self> {
+        let mut seen = BTreeSet::new();
+        for reference in references.as_slice() {
+            if !seen.insert(*reference) {
+                return Err(GuardError::Invariant {
+                    field: "evidence_basis.distinct_references",
+                });
+            }
+        }
+        Ok(Self {
+            references,
+            assumptions,
+        })
+    }
+
+    pub fn from_references(references: NonEmptyVec<ObservationId>) -> GuardResult<Self> {
+        Self::new(references, Vec::new())
+    }
 }
 
 /// Evaluation outcome vocabulary.
@@ -398,8 +442,24 @@ pub enum EvaluationResult {
 pub struct EvaluationDeclaration {
     pub id: EvaluationId,
     pub policy: PolicyId,
-    pub evidence_basis: NonEmptyVec<ObservationId>,
+    pub evidence_basis: EvidenceBasis,
     pub result: EvaluationResult,
+}
+
+impl EvaluationDeclaration {
+    pub fn new(
+        id: EvaluationId,
+        policy: PolicyId,
+        evidence_basis: EvidenceBasis,
+        result: EvaluationResult,
+    ) -> Self {
+        Self {
+            id,
+            policy,
+            evidence_basis,
+            result,
+        }
+    }
 }
 
 fn operator_matches_value(operator: &RequirementOperator, value: &TypedValue) -> bool {

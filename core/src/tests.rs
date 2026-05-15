@@ -22,12 +22,13 @@ use crate::{
         Trust, TrustGrant, TrustParties, Zone,
     },
     theory::{
-        ActorDeclaration, ActorRole, BoundaryDeclaration, EdgeDeclaration, EdgeSort,
+        ActorDeclaration, ActorRole, BoundaryDeclaration, Edge, EdgeDeclaration, EdgeSort,
         EvaluationContextDeclaration, EvaluationDeclaration, EvaluationResult,
-        EvidenceSourceDeclaration, MembershipPredicateDeclaration, ModelDeclaration,
+        EvidenceBasis, EvidenceItem, EvidenceSourceDeclaration, MembershipPredicateDeclaration,
+        ModelDeclaration,
         ObservationDeclaration, PolicyDeclaration, PresenceOperator, ReferentDeclaration,
-        ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, SideDeclaration,
-        SideLabel, SurfaceDeclaration, TypedScopeDeclaration, TypedValue,
+        ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, Referent,
+        SideDeclaration, SideLabel, SurfaceDeclaration, TypedScopeDeclaration, TypedValue,
     },
     theory_validation::{
         validate_core_theory_library, CoreTheoryLibrary, TheorySubject, TheoryViolationCode,
@@ -658,10 +659,60 @@ fn sample_core_theory_library() -> CoreTheoryLibrary {
         evaluations: vec![EvaluationDeclaration {
             id: evaluation_id,
             policy: policy_id,
-            evidence_basis: NonEmptyVec::from_item(observation_id),
+            evidence_basis: EvidenceBasis::from_references(NonEmptyVec::from_item(observation_id))
+                .unwrap(),
             result: EvaluationResult::Unknown,
         }],
     }
+}
+
+#[test]
+fn foundational_referent_and_edge_types_construct_coherently() {
+    let from = Referent {
+        id: ReferentId::from_bytes([70u8; 16]),
+        sort: ReferentSort::Actor,
+    };
+    let to = Referent {
+        id: ReferentId::from_bytes([71u8; 16]),
+        sort: ReferentSort::Boundary,
+    };
+
+    let edge = Edge::new(
+        EdgeId::from_bytes([72u8; 16]),
+        EdgeSort::DependsOn,
+        from.id,
+        to.id,
+    )
+    .unwrap();
+
+    assert_eq!(edge.from, from.id);
+    assert_eq!(edge.to, to.id);
+}
+
+#[test]
+fn evidence_basis_rejects_duplicate_references() {
+    let observation = ObservationId::from_bytes([73u8; 16]);
+    let result = EvidenceBasis::new(
+        NonEmptyVec::new(vec![observation, observation], "references").unwrap(),
+        Vec::new(),
+    );
+    assert!(result.is_err());
+}
+
+#[test]
+fn evidence_item_and_observation_alias_match_shape() {
+    let item = EvidenceItem {
+        id: ObservationId::from_bytes([74u8; 16]),
+        source: EvidenceSourceId::from_bytes([75u8; 16]),
+        observed_referent: Some(ReferentId::from_bytes([76u8; 16])),
+        observed_sort: ReferentSort::ReleaseArtifact,
+        at: timestamp(),
+        claim: TypedValue::Bool(true),
+    };
+    let observation: ObservationDeclaration = item.clone();
+
+    assert_eq!(observation.id, item.id);
+    assert_eq!(observation.source, item.source);
 }
 
 #[test]
