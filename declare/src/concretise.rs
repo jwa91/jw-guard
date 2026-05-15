@@ -46,6 +46,7 @@ pub enum ConcretisationFailure {
     CanonicalPathContractViolations(Vec<CanonicalPathContractViolation>),
     SchemaVersionDomainViolation { value: String },
     DeterministicIdCollisions(Vec<DeterministicIdCollision>),
+    MissingTraceEntries(Vec<TraceEntryViolation>),
     TheoryViolations(Vec<TheoryViolation>),
 }
 
@@ -65,6 +66,15 @@ pub struct DeterministicIdCollision {
     pub kind: DeterministicIdKind,
     pub first_path: String,
     pub second_path: String,
+}
+
+/// Canonical trace-map contract violation detail.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TraceEntryViolation {
+    pub namespace: String,
+    pub declaration_name: String,
+    pub reason: String,
 }
 
 /// One concretisation stage result.
@@ -125,7 +135,29 @@ pub struct CanonicalPaths {
 pub struct CanonicalModel {
     pub normalized: NormalizedSecurityDeclaration,
     pub paths: CanonicalPaths,
+    pub trace: CanonicalTraceMap,
     pub theory: CoreTheoryLibrary,
+}
+
+/// Deterministic trace entry from declaration name to canonical object.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CanonicalTraceEntry {
+    pub canonical_path: String,
+    pub deterministic_id: [u8; 16],
+}
+
+/// Deterministic declaration-to-canonical trace map.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CanonicalTraceMap {
+    pub model: CanonicalTraceEntry,
+    pub zones: Vec<(DeclarationName, CanonicalTraceEntry)>,
+    pub boundaries: Vec<(DeclarationName, CanonicalTraceEntry)>,
+    pub routes: Vec<(DeclarationName, CanonicalTraceEntry)>,
+    pub scopes: Vec<(DeclarationName, CanonicalTraceEntry)>,
+    pub policies: Vec<(DeclarationName, CanonicalTraceEntry)>,
+    pub requirements: Vec<(DeclarationName, CanonicalTraceEntry)>,
 }
 
 /// Deterministic domain-separated id kinds.
@@ -284,6 +316,7 @@ pub fn derive_canonical_paths(normalized: &NormalizedSecurityDeclaration) -> Can
 pub fn build_canonical_model(normalized: NormalizedSecurityDeclaration) -> CanonicalModel {
     let paths = derive_canonical_paths(&normalized);
     let schema_version = &normalized.declaration_version;
+    let trace = build_canonical_trace_map(&paths, schema_version);
 
     let model_id = ModelId::from_bytes(derive_deterministic_id(
         DeterministicIdKind::Model,
@@ -563,6 +596,7 @@ pub fn build_canonical_model(normalized: NormalizedSecurityDeclaration) -> Canon
     CanonicalModel {
         normalized,
         paths,
+        trace,
         theory,
     }
 }
@@ -645,10 +679,20 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
     }
 
     let canonical_model = build_canonical_model(normalized);
+    let trace_violations = validate_trace_map_contract(&canonical_model);
+    let trace_passed = trace_violations.is_empty();
     stages.push(ConcretisationStageResult {
         stage: ConcretisationStage::BuildCanonicalTheoryGraph,
-        passed: true,
+        passed: trace_passed,
     });
+    if !trace_passed {
+        return ConcretisationReport {
+            stages,
+            halted_at: Some(ConcretisationStage::BuildCanonicalTheoryGraph),
+            failure: Some(ConcretisationFailure::MissingTraceEntries(trace_violations)),
+            canonical_model: Some(canonical_model),
+        };
+    }
 
     let theory_violations = validate_core_theory_library(&canonical_model.theory);
     let theory_passed = theory_violations.is_empty();
@@ -670,6 +714,260 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
         halted_at: None,
         failure: None,
         canonical_model: Some(canonical_model),
+    }
+}
+
+fn build_canonical_trace_map(paths: &CanonicalPaths, schema_version: &SemVer) -> CanonicalTraceMap {
+    let mut zones: Vec<_> = paths
+        .zones
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Referent,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    zones.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut boundaries: Vec<_> = paths
+        .boundaries
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Boundary,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    boundaries.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut routes: Vec<_> = paths
+        .routes
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Edge,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    routes.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut scopes: Vec<_> = paths
+        .scopes
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Scope,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    scopes.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut policies: Vec<_> = paths
+        .policies
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Policy,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    policies.sort_by(|left, right| left.0.cmp(&right.0));
+
+    let mut requirements: Vec<_> = paths
+        .requirements
+        .iter()
+        .map(|(name, path)| {
+            (
+                name.clone(),
+                CanonicalTraceEntry {
+                    canonical_path: path.clone(),
+                    deterministic_id: derive_deterministic_id(
+                        DeterministicIdKind::Requirement,
+                        schema_version,
+                        path,
+                    ),
+                },
+            )
+        })
+        .collect();
+    requirements.sort_by(|left, right| left.0.cmp(&right.0));
+
+    CanonicalTraceMap {
+        model: CanonicalTraceEntry {
+            canonical_path: paths.model.clone(),
+            deterministic_id: derive_deterministic_id(
+                DeterministicIdKind::Model,
+                schema_version,
+                &paths.model,
+            ),
+        },
+        zones,
+        boundaries,
+        routes,
+        scopes,
+        policies,
+        requirements,
+    }
+}
+
+pub fn validate_trace_map_contract(canonical_model: &CanonicalModel) -> Vec<TraceEntryViolation> {
+    let mut violations = Vec::new();
+    let schema_version = &canonical_model.normalized.declaration_version;
+    let paths = &canonical_model.paths;
+    let trace = &canonical_model.trace;
+
+    if trace.model.canonical_path != paths.model {
+        violations.push(TraceEntryViolation {
+            namespace: "model".to_owned(),
+            declaration_name: "model".to_owned(),
+            reason: "canonical path mismatch".to_owned(),
+        });
+    }
+    let expected_model_id =
+        derive_deterministic_id(DeterministicIdKind::Model, schema_version, &paths.model);
+    if trace.model.deterministic_id != expected_model_id {
+        violations.push(TraceEntryViolation {
+            namespace: "model".to_owned(),
+            declaration_name: "model".to_owned(),
+            reason: "deterministic id mismatch".to_owned(),
+        });
+    }
+
+    validate_trace_entries(
+        &mut violations,
+        "zone",
+        DeterministicIdKind::Referent,
+        &paths.zones,
+        &trace.zones,
+        schema_version,
+    );
+    validate_trace_entries(
+        &mut violations,
+        "boundary",
+        DeterministicIdKind::Boundary,
+        &paths.boundaries,
+        &trace.boundaries,
+        schema_version,
+    );
+    validate_trace_entries(
+        &mut violations,
+        "route",
+        DeterministicIdKind::Edge,
+        &paths.routes,
+        &trace.routes,
+        schema_version,
+    );
+    validate_trace_entries(
+        &mut violations,
+        "scope",
+        DeterministicIdKind::Scope,
+        &paths.scopes,
+        &trace.scopes,
+        schema_version,
+    );
+    validate_trace_entries(
+        &mut violations,
+        "policy",
+        DeterministicIdKind::Policy,
+        &paths.policies,
+        &trace.policies,
+        schema_version,
+    );
+    validate_trace_entries(
+        &mut violations,
+        "requirement",
+        DeterministicIdKind::Requirement,
+        &paths.requirements,
+        &trace.requirements,
+        schema_version,
+    );
+
+    violations
+}
+
+fn validate_trace_entries(
+    violations: &mut Vec<TraceEntryViolation>,
+    namespace: &str,
+    kind: DeterministicIdKind,
+    expected_paths: &[(DeclarationName, String)],
+    actual_entries: &[(DeclarationName, CanonicalTraceEntry)],
+    schema_version: &SemVer,
+) {
+    let expected_by_name: BTreeMap<DeclarationName, String> = expected_paths
+        .iter()
+        .map(|(name, path)| (name.clone(), path.clone()))
+        .collect();
+    let actual_by_name: BTreeMap<DeclarationName, CanonicalTraceEntry> = actual_entries
+        .iter()
+        .map(|(name, entry)| (name.clone(), entry.clone()))
+        .collect();
+
+    for (name, expected_path) in &expected_by_name {
+        let Some(actual_entry) = actual_by_name.get(name) else {
+            violations.push(TraceEntryViolation {
+                namespace: namespace.to_owned(),
+                declaration_name: name.as_str().to_owned(),
+                reason: "missing trace entry".to_owned(),
+            });
+            continue;
+        };
+
+        if actual_entry.canonical_path != *expected_path {
+            violations.push(TraceEntryViolation {
+                namespace: namespace.to_owned(),
+                declaration_name: name.as_str().to_owned(),
+                reason: "canonical path mismatch".to_owned(),
+            });
+        }
+
+        let expected_id = derive_deterministic_id(kind, schema_version, expected_path);
+        if actual_entry.deterministic_id != expected_id {
+            violations.push(TraceEntryViolation {
+                namespace: namespace.to_owned(),
+                declaration_name: name.as_str().to_owned(),
+                reason: "deterministic id mismatch".to_owned(),
+            });
+        }
     }
 }
 

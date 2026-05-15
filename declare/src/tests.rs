@@ -12,7 +12,8 @@ use jw_guard_core::{
 use crate::{
     concretise::{
         build_canonical_model, derive_deterministic_id, normalize_security_declaration,
-        run_concretisation_loop, ConcretisationFailure, ConcretisationStage, DeterministicIdKind,
+        run_concretisation_loop, validate_trace_map_contract, ConcretisationFailure,
+        ConcretisationStage, DeterministicIdKind,
     },
     declaration::{
         BoundaryDeclaration, BoundaryEndRef, GateRequirement, LayerRequirement, RouteDeclaration,
@@ -443,6 +444,21 @@ fn concretisation_loop_passes_on_coherent_declaration() {
         .stages
         .iter()
         .any(|stage| stage.stage == ConcretisationStage::ValidateCanonicalTheoryGraph));
+    let canonical = report
+        .canonical_model
+        .as_ref()
+        .expect("successful concretisation must build canonical model");
+    assert_eq!(canonical.trace.model.canonical_path, canonical.paths.model);
+    assert!(canonical
+        .trace
+        .zones
+        .iter()
+        .any(|(entry_name, _)| entry_name == &name("dev")));
+    assert!(canonical
+        .trace
+        .requirements
+        .iter()
+        .any(|(entry_name, _)| entry_name == &name("source-policy")));
 }
 
 #[test]
@@ -459,7 +475,23 @@ fn canonical_model_is_stable_across_input_permutations() {
     let canonical_right = build_canonical_model(normalize_security_declaration(&right));
 
     assert_eq!(canonical_left.paths, canonical_right.paths);
+    assert_eq!(canonical_left.trace, canonical_right.trace);
     assert_eq!(canonical_left.theory, canonical_right.theory);
+}
+
+#[test]
+fn trace_map_contract_rejects_missing_required_entry() {
+    let declaration = declaration_with_policy();
+    let mut canonical = build_canonical_model(normalize_security_declaration(&declaration));
+    canonical.trace.zones.clear();
+
+    let violations = validate_trace_map_contract(&canonical);
+
+    assert!(violations.iter().any(|violation| {
+        violation.namespace == "zone"
+            && violation.declaration_name == "dev"
+            && violation.reason == "missing trace entry"
+    }));
 }
 
 #[test]
