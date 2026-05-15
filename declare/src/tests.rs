@@ -12,7 +12,7 @@ use jw_guard_core::{
 use crate::{
     concretise::{
         build_canonical_model, derive_deterministic_id, normalize_security_declaration,
-        run_concretisation_loop, ConcretisationStage, DeterministicIdKind,
+        run_concretisation_loop, ConcretisationFailure, ConcretisationStage, DeterministicIdKind,
     },
     declaration::{
         BoundaryDeclaration, BoundaryEndRef, GateRequirement, LayerRequirement, RouteDeclaration,
@@ -460,4 +460,80 @@ fn canonical_model_is_stable_across_input_permutations() {
 
     assert_eq!(canonical_left.paths, canonical_right.paths);
     assert_eq!(canonical_left.theory, canonical_right.theory);
+}
+
+#[test]
+fn concretisation_loop_rejects_duplicate_canonical_paths_in_scope_namespace() {
+    let mut declaration = declaration_with_policy();
+    declaration.scopes.push(ScopeDeclaration {
+        name: DeclarationName::new_unchecked("route-policy/source-policy"),
+        kind: ScopeKind::ArtifactFlow,
+        target: ScopeTarget::Route(name("source")),
+        required_capabilities: NonEmptyVec::from_item(Capability::RouteExecuteTransfer),
+        forbidden_capabilities: vec![Capability::RouteApproveTransfer],
+    });
+
+    let report = run_concretisation_loop(&declaration);
+
+    assert_eq!(report.halted_at, Some(ConcretisationStage::DeriveCanonicalPaths));
+    let Some(ConcretisationFailure::CanonicalPathContractViolations(violations)) = report.failure
+    else {
+        panic!("expected canonical path contract violations");
+    };
+    assert!(violations.iter().any(|violation| {
+        violation.namespace == "scope" && violation.reason.contains("duplicate canonical path")
+    }));
+}
+
+#[test]
+fn concretisation_loop_rejects_structurally_invalid_canonical_paths() {
+    let mut declaration = declaration_with_policy();
+    declaration.scopes[0].name = DeclarationName::new_unchecked("");
+
+    let report = run_concretisation_loop(&declaration);
+
+    assert_eq!(report.halted_at, Some(ConcretisationStage::DeriveCanonicalPaths));
+    let Some(ConcretisationFailure::CanonicalPathContractViolations(violations)) = report.failure
+    else {
+        panic!("expected canonical path contract violations");
+    };
+    assert!(violations.iter().any(|violation| {
+        violation.namespace == "scope"
+            && violation
+                .reason
+                .contains("expected prefix `scope/` with non-empty name segment")
+    }));
+}
+
+#[test]
+fn concretisation_loop_rejects_schema_version_outside_id_domain() {
+    let mut declaration = declaration_with_policy();
+    declaration.declaration_version = SemVer::new_unchecked("1.0");
+
+    let report = run_concretisation_loop(&declaration);
+
+    assert_eq!(
+        report.halted_at,
+        Some(ConcretisationStage::DeriveDeterministicIds)
+    );
+    let Some(ConcretisationFailure::SchemaVersionDomainViolation { value }) = report.failure else {
+        panic!("expected schema version domain violation");
+    };
+    assert_eq!(value, "1.0");
+}
+
+#[test]
+fn concretisation_loop_guards_preserve_valid_declaration_path() {
+    let declaration = declaration_with_policy();
+
+    let report = run_concretisation_loop(&declaration);
+
+    assert!(report.passed(), "{report:#?}");
+    assert!(report
+        .stages
+        .iter()
+        .any(|stage| stage.stage == ConcretisationStage::DeriveCanonicalPaths && stage.passed));
+    assert!(report.stages.iter().any(|stage| {
+        stage.stage == ConcretisationStage::DeriveDeterministicIds && stage.passed
+    }));
 }

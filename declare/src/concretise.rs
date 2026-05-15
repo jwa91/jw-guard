@@ -43,8 +43,19 @@ pub enum ConcretisationStage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConcretisationFailure {
     DeclarationViolations(Vec<DeclarationViolation>),
+    CanonicalPathContractViolations(Vec<CanonicalPathContractViolation>),
+    SchemaVersionDomainViolation { value: String },
     DeterministicIdCollisions(Vec<DeterministicIdCollision>),
     TheoryViolations(Vec<TheoryViolation>),
+}
+
+/// Canonical path contract violation detail.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CanonicalPathContractViolation {
+    pub namespace: String,
+    pub path: String,
+    pub reason: String,
 }
 
 /// Deterministic-id collision detail.
@@ -584,13 +595,40 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
     });
 
     let paths = derive_canonical_paths(&normalized);
+    let path_contract_violations = validate_canonical_path_contracts(&paths);
+    let paths_passed = path_contract_violations.is_empty();
     stages.push(ConcretisationStageResult {
         stage: ConcretisationStage::DeriveCanonicalPaths,
-        passed: true,
+        passed: paths_passed,
     });
+    if !paths_passed {
+        return ConcretisationReport {
+            stages,
+            halted_at: Some(ConcretisationStage::DeriveCanonicalPaths),
+            failure: Some(ConcretisationFailure::CanonicalPathContractViolations(
+                path_contract_violations,
+            )),
+            canonical_model: None,
+        };
+    }
 
     // Smoke-check deterministic id derivation with model path.
     let schema_version = &normalized.declaration_version;
+    let schema_value = schema_version.as_str();
+    if !is_schema_version_domain_valid(schema_value) {
+        stages.push(ConcretisationStageResult {
+            stage: ConcretisationStage::DeriveDeterministicIds,
+            passed: false,
+        });
+        return ConcretisationReport {
+            stages,
+            halted_at: Some(ConcretisationStage::DeriveDeterministicIds),
+            failure: Some(ConcretisationFailure::SchemaVersionDomainViolation {
+                value: schema_value.to_owned(),
+            }),
+            canonical_model: None,
+        };
+    }
     let collisions = detect_deterministic_id_collisions(&paths, schema_version);
     let ids_passed = collisions.is_empty();
     stages.push(ConcretisationStageResult {
@@ -633,6 +671,129 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
         failure: None,
         canonical_model: Some(canonical_model),
     }
+}
+
+fn validate_canonical_path_contracts(paths: &CanonicalPaths) -> Vec<CanonicalPathContractViolation> {
+    let mut violations = Vec::new();
+    let mut seen_by_namespace: BTreeMap<String, String> = BTreeMap::new();
+
+    let mut record_namespace = |namespace: &str, path: &str| {
+        let key = format!("{namespace}:{path}");
+        if let Some(first) = seen_by_namespace.get(&key) {
+            violations.push(CanonicalPathContractViolation {
+                namespace: namespace.to_owned(),
+                path: path.to_owned(),
+                reason: format!("duplicate canonical path (first seen as {first})"),
+            });
+        } else {
+            seen_by_namespace.insert(key, path.to_owned());
+        }
+    };
+
+    record_namespace("model", &paths.model);
+    record_namespace("actor", &paths.actor_system);
+    for (_, path) in &paths.zones {
+        record_namespace("referent", path);
+    }
+    for (_, path) in &paths.boundaries {
+        record_namespace("boundary", path);
+    }
+    for (_, path) in &paths.scopes {
+        record_namespace("scope", path);
+    }
+    for (_, path) in &paths.routes {
+        record_namespace("edge", path);
+    }
+    for (_, path) in &paths.policies {
+        record_namespace("policy", path);
+    }
+    for (_, path) in &paths.requirements {
+        record_namespace("requirement", path);
+    }
+    for (_, path) in &paths.policy_scopes {
+        record_namespace("scope", path);
+    }
+
+    validate_family_path(
+        &mut violations,
+        "model",
+        &paths.model,
+        "model/",
+    );
+    validate_family_path(
+        &mut violations,
+        "actor",
+        &paths.actor_system,
+        "actor/",
+    );
+    for (_, path) in &paths.scopes {
+        validate_family_path(&mut violations, "scope", path, "scope/");
+    }
+    for (_, path) in &paths.policy_scopes {
+        validate_family_path(&mut violations, "scope", path, "scope/");
+    }
+    for (_, path) in &paths.policies {
+        validate_family_path(&mut violations, "policy", path, "policy/");
+    }
+    for (_, path) in &paths.requirements {
+        validate_family_path(&mut violations, "requirement", path, "requirement/");
+    }
+
+    violations
+}
+
+fn validate_family_path(
+    violations: &mut Vec<CanonicalPathContractViolation>,
+    namespace: &str,
+    path: &str,
+    required_prefix: &str,
+) {
+    if !has_prefix_and_non_empty_name_segment(path, required_prefix) {
+        violations.push(CanonicalPathContractViolation {
+            namespace: namespace.to_owned(),
+            path: path.to_owned(),
+            reason: format!(
+                "expected prefix `{required_prefix}` with non-empty name segment"
+            ),
+        });
+    }
+}
+
+fn has_prefix_and_non_empty_name_segment(path: &str, required_prefix: &str) -> bool {
+    let Some(remainder) = path.strip_prefix(required_prefix) else {
+        return false;
+    };
+    if remainder.is_empty() {
+        return false;
+    }
+    remainder
+        .split('/')
+        .next_back()
+        .map(|segment| !segment.is_empty())
+        .unwrap_or(false)
+}
+
+fn is_schema_version_domain_valid(version: &str) -> bool {
+    if version.trim().is_empty() {
+        return false;
+    }
+
+    let mut parts = version.split('.');
+    let Some(major) = parts.next() else {
+        return false;
+    };
+    let Some(minor) = parts.next() else {
+        return false;
+    };
+    let Some(patch) = parts.next() else {
+        return false;
+    };
+    if parts.next().is_some() {
+        return false;
+    }
+    [major, minor, patch]
+        .iter()
+        .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 fn detect_deterministic_id_collisions(
