@@ -28,6 +28,16 @@ pub enum ViolationSeverity {
     Error,
 }
 
+/// Classifies whether a violation is neutral core typing or policy/profile opinion.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum ViolationClassification {
+    /// Structural/type-system invariant that is independent of policy posture.
+    NeutralCoreInvariant,
+    /// Policy/profile choice about desired security posture.
+    PolicyProfileInvariant,
+}
+
 /// Machine-readable validation code.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -89,6 +99,41 @@ pub enum ViolationCode {
     TrustChainInvariant,
 }
 
+impl ViolationCode {
+    /// Returns high-level invariant classification for this violation code.
+    pub const fn classification(self) -> ViolationClassification {
+        match self {
+            Self::EmptyRequiredSequence
+            | Self::DuplicateId
+            | Self::FilesystemRootOverlap
+            | Self::BoundarySelfConnection
+            | Self::BoundaryOutsideOnly
+            | Self::BoundaryTrustOrder
+            | Self::DuplicateBoundaryPair
+            | Self::MissingReference
+            | Self::LayerHardnessMismatch
+            | Self::BoundarySpecSurfaceOrder
+            | Self::RouteBoundaryMismatch
+            | Self::RouteWithoutGate
+            | Self::IdentityKindInvariant
+            | Self::CredentialInvariant
+            | Self::TrustInvariant
+            | Self::ArtifactContractInvariant
+            | Self::PolicyInvariant
+            | Self::AccessDecisionInvariant
+            | Self::TrustChainInvariant => ViolationClassification::NeutralCoreInvariant,
+            Self::SigningZoneSoftIsolation
+            | Self::QuarantineZoneTrust
+            | Self::HighTrustBoundaryFailOpen
+            | Self::BoundarySpecUnprotected
+            | Self::GateMissingVerification
+            | Self::ScopeCapabilityInvariant
+            | Self::RootOfflineCredentialMissing
+            | Self::TrustGrantAuthorityMissing => ViolationClassification::PolicyProfileInvariant,
+        }
+    }
+}
+
 /// Object a validation result refers to.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -127,6 +172,16 @@ pub struct Violation {
     pub subject: ValidationSubject,
 }
 
+/// Count summary of violations by high-level invariant class.
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ViolationClassificationCounts {
+    /// Neutral core-typing invariant violations.
+    pub neutral_core_invariant: usize,
+    /// Policy/profile invariant violations.
+    pub policy_profile_invariant: usize,
+}
+
 impl Violation {
     fn error(code: ViolationCode, subject: ValidationSubject) -> Self {
         Self {
@@ -143,6 +198,22 @@ impl Violation {
             subject,
         }
     }
+}
+
+/// Summarizes violations into counts grouped by classification.
+pub fn summarize_violation_classifications(
+    violations: &[Violation],
+) -> ViolationClassificationCounts {
+    let mut counts = ViolationClassificationCounts::default();
+    for violation in violations {
+        match violation.code.classification() {
+            ViolationClassification::NeutralCoreInvariant => counts.neutral_core_invariant += 1,
+            ViolationClassification::PolicyProfileInvariant => {
+                counts.policy_profile_invariant += 1;
+            }
+        }
+    }
+    counts
 }
 
 /// Validates static zone invariants.

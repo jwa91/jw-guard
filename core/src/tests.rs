@@ -32,7 +32,10 @@ use crate::{
     theory_validation::{
         validate_core_theory_library, CoreTheoryLibrary, TheorySubject, TheoryViolationCode,
     },
-    validation::{validate_security_model, ValidationSubject, Violation, ViolationCode},
+    validation::{
+        summarize_violation_classifications, validate_security_model, ValidationSubject, Violation,
+        ViolationClassification, ViolationCode, ViolationClassificationCounts, ViolationSeverity,
+    },
 };
 
 fn zone_id(byte: u8) -> ZoneId {
@@ -142,6 +145,51 @@ fn has_violation(
     violations
         .iter()
         .any(|violation| violation.code == code && violation.subject == subject)
+}
+
+#[test]
+fn violation_code_classifies_neutral_invariant() {
+    assert_eq!(
+        ViolationCode::DuplicateId.classification(),
+        ViolationClassification::NeutralCoreInvariant
+    );
+}
+
+#[test]
+fn violation_code_classifies_policy_profile_invariant() {
+    assert_eq!(
+        ViolationCode::GateMissingVerification.classification(),
+        ViolationClassification::PolicyProfileInvariant
+    );
+}
+
+#[test]
+fn violation_summary_counts_by_classification() {
+    let violations = vec![
+        Violation {
+            severity: ViolationSeverity::Error,
+            code: ViolationCode::DuplicateId,
+            subject: ValidationSubject::Model,
+        },
+        Violation {
+            severity: ViolationSeverity::Warning,
+            code: ViolationCode::BoundarySpecUnprotected,
+            subject: ValidationSubject::Model,
+        },
+        Violation {
+            severity: ViolationSeverity::Error,
+            code: ViolationCode::MissingReference,
+            subject: ValidationSubject::Model,
+        },
+    ];
+
+    assert_eq!(
+        summarize_violation_classifications(&violations),
+        ViolationClassificationCounts {
+            neutral_core_invariant: 2,
+            policy_profile_invariant: 1,
+        }
+    );
 }
 
 #[test]
