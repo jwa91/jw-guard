@@ -569,3 +569,21 @@ fn concretisation_loop_guards_preserve_valid_declaration_path() {
         stage.stage == ConcretisationStage::DeriveDeterministicIds && stage.passed
     }));
 }
+
+#[test]
+fn concretisation_progress_score_reports_halted_stage() {
+    let report = run_concretisation_loop(&declaration());
+    let score = report.progress_score();
+    let expected_passed = report.stages.iter().take_while(|stage| stage.passed).count();
+    let expected_ratio = ((expected_passed * 100) / report.stages.len()) as u8;
+
+    assert!(!report.passed());
+    assert!(report.halted_at.is_some());
+    assert_eq!(score.passed_stages, expected_passed);
+    assert_eq!(score.total_stages, report.stages.len());
+    assert_eq!(score.completion_ratio, expected_ratio);
+    assert_eq!(
+        score.first_failed_stage,
+        report.halted_at.map(ConcretisationStage::stage_key)
+    );
+}

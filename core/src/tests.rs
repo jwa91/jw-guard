@@ -534,6 +534,17 @@ fn concept_feedback_loop_reaches_top_layer_when_core_atoms_exist() {
         .all(|layer| layer.layer >= ConceptLayer::PrimitiveDatatypes && layer.passed()));
 }
 
+#[test]
+fn concept_feedback_loop_progress_score_reports_all_pass() {
+    let report = run_core_concept_feedback_loop();
+    let score = report.progress_score();
+
+    assert_eq!(score.passed_stages, 6);
+    assert_eq!(score.total_stages, 6);
+    assert_eq!(score.completion_ratio, 100);
+    assert_eq!(score.first_failed_stage, None);
+}
+
 fn sample_core_theory_library() -> CoreTheoryLibrary {
     let actor_id = ActorId::from_bytes([1u8; 16]);
     let boundary_referent = ReferentId::from_bytes([2u8; 16]);

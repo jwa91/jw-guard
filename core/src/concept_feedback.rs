@@ -36,6 +36,20 @@ pub enum ConceptLayer {
     EvidenceAtoms,
 }
 
+impl ConceptLayer {
+    /// Stable stage key for progress reporting.
+    pub const fn stage_key(self) -> &'static str {
+        match self {
+            Self::PrimitiveDatatypes => "primitive_datatypes",
+            Self::IdentityAtoms => "identity_atoms",
+            Self::SortAtoms => "sort_atoms",
+            Self::GraphAtoms => "graph_atoms",
+            Self::PolicyAtoms => "policy_atoms",
+            Self::EvidenceAtoms => "evidence_atoms",
+        }
+    }
+}
+
 /// Severity for concept-layer findings.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -102,10 +116,47 @@ pub struct ConceptFeedbackLoopReport {
     pub halted_at: Option<ConceptLayer>,
 }
 
+/// Compact deterministic progress score for concept feedback loops.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ConceptFeedbackProgressScore {
+    /// Number of stages that completed successfully.
+    pub passed_stages: usize,
+    /// Number of stages that were evaluated.
+    pub total_stages: usize,
+    /// Integer completion ratio in percent.
+    pub completion_ratio: u8,
+    /// First failed stage key, when any stage failed.
+    pub first_failed_stage: Option<&'static str>,
+}
+
 impl ConceptFeedbackLoopReport {
     /// Returns true when all evaluated layers passed and the loop reached the top layer.
     pub fn passed_all(&self) -> bool {
         self.halted_at.is_none()
+    }
+
+    /// Computes a compact score for orchestration progress tracking.
+    pub fn progress_score(&self) -> ConceptFeedbackProgressScore {
+        let total_stages = self.layers.len();
+        let passed_stages = self.layers.iter().take_while(|layer| layer.passed()).count();
+        let completion_ratio = if total_stages == 0 {
+            0
+        } else {
+            ((passed_stages * 100) / total_stages) as u8
+        };
+        let first_failed_stage = self
+            .layers
+            .iter()
+            .find(|layer| !layer.passed())
+            .map(|layer| layer.layer.stage_key());
+
+        ConceptFeedbackProgressScore {
+            passed_stages,
+            total_stages,
+            completion_ratio,
+            first_failed_stage,
+        }
     }
 }
 

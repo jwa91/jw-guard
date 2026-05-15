@@ -38,6 +38,20 @@ pub enum ConcretisationStage {
     ValidateCanonicalTheoryGraph,
 }
 
+impl ConcretisationStage {
+    /// Stable stage key for progress reporting.
+    pub const fn stage_key(self) -> &'static str {
+        match self {
+            Self::ValidateDeclaration => "validate_declaration",
+            Self::NormalizeDeclaration => "normalize_declaration",
+            Self::DeriveCanonicalPaths => "derive_canonical_paths",
+            Self::DeriveDeterministicIds => "derive_deterministic_ids",
+            Self::BuildCanonicalTheoryGraph => "build_canonical_theory_graph",
+            Self::ValidateCanonicalTheoryGraph => "validate_canonical_theory_graph",
+        }
+    }
+}
+
 /// Failure reason for a concretisation stage.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -95,10 +109,47 @@ pub struct ConcretisationReport {
     pub canonical_model: Option<CanonicalModel>,
 }
 
+/// Compact deterministic progress score for concretisation loops.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ConcretisationProgressScore {
+    /// Number of stages that completed successfully.
+    pub passed_stages: usize,
+    /// Number of stages that were evaluated.
+    pub total_stages: usize,
+    /// Integer completion ratio in percent.
+    pub completion_ratio: u8,
+    /// First failed stage key, when any stage failed.
+    pub first_failed_stage: Option<&'static str>,
+}
+
 impl ConcretisationReport {
     /// Returns true when every stage passed.
     pub fn passed(&self) -> bool {
         self.halted_at.is_none()
+    }
+
+    /// Computes a compact score for orchestration progress tracking.
+    pub fn progress_score(&self) -> ConcretisationProgressScore {
+        let total_stages = self.stages.len();
+        let passed_stages = self.stages.iter().take_while(|stage| stage.passed).count();
+        let completion_ratio = if total_stages == 0 {
+            0
+        } else {
+            ((passed_stages * 100) / total_stages) as u8
+        };
+        let first_failed_stage = self
+            .stages
+            .iter()
+            .find(|stage| !stage.passed)
+            .map(|stage| stage.stage.stage_key());
+
+        ConcretisationProgressScore {
+            passed_stages,
+            total_stages,
+            completion_ratio,
+            first_failed_stage,
+        }
     }
 }
 
