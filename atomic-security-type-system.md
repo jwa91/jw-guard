@@ -1109,3 +1109,89 @@ are explicitly out of scope and belong in higher-level documents:
 Each of these layers composes from the atoms and fundamentals defined
 here. If this layer is wrong, everything above it is wrong. Get this
 right first.
+
+---
+
+## 9. Authoritative First-Principles Direction Map
+
+This section is the single authoritative control-loop artifact for
+implementation direction. It is intentionally deterministic and
+minimally opinionated.
+
+### 9.1 Atomic Consent Map (first-principles definitions)
+
+Consent is the typed answer to one question: **may movement occur across
+this boundary under these constraints?** The consent map is therefore the
+minimal atom-to-decision chain:
+
+1. **Container reality:** `Zone` defines containment and trust context.
+2. **Crossing locus:** `Boundary` defines where protection applies.
+3. **Observable face:** `Surface` defines what is visible/reachable.
+4. **Protection stack:** `Layer` defines hardness and fail behavior.
+5. **Directional movement:** `Route` defines possible flow direction and cadence.
+6. **Verification checkpoint:** `Gate` defines mandatory checks.
+7. **Principal identity:** `Identity` defines who acts.
+8. **Operational universe:** `Scope` defines what operations exist.
+9. **Authentication proof:** `Credential` defines presented evidence.
+10. **Authorization link:** `Trust` binds identity to scope.
+
+Deterministic consent construction order for any access attempt:
+
+`Zone -> Boundary -> Surface -> Layer -> Route -> Gate -> Identity -> Scope -> Credential -> Trust -> AccessDecision`
+
+If any required predecessor is missing or invalid, consent is `deny` by
+construction.
+
+### 9.2 Security/Hardening Universe Coverage Map
+
+Coverage is complete only when every domain below maps to atoms,
+invariants, and validation gates:
+
+| Domain | Atomic owners | Mandatory invariants | Deterministic gate |
+|---|---|---|---|
+| Containment | Zone, Boundary | distinct ownership, canonical side ordering | construct + semantic validation |
+| Exposure | Surface | exactly two faces per boundary, bounded exposure | boundary/surface linkage checks |
+| Isolation hardness | Layer | mechanism-hardness compatibility, fail-closed posture at high trust | layer + boundary semantic validation |
+| Movement control | Route, Gate | endpoint-boundary coherence, gate presence and sequence | route + policy validation |
+| Signing safety | Zone, Route, Gate, Scope | expressible constraints only; concrete cadence/signature obligations must be declared as policy requirements, not implicit core axioms | declaration + policy evaluation |
+| Identity/authentication | Identity, Credential | kind constraints, credential strength/mechanism correctness | identity/credential validation |
+| Authorization | Trust, Scope | authority chain, scope-zone alignment, minimum credential strength | trust + model semantic validation |
+| Audit integrity | AccessDecision, TrustChain | verdict/reason coherence, chain validity | decision + trust-chain validation |
+| Deterministic construction | CanonicalPaths, deterministic IDs, theory graph | normalized ordering, path contracts, collision absence, trace-map coherence | concretisation stage gates |
+
+Coverage rule: no new security concept may be introduced unless it is
+expressible as (a) atom extension, or (b) composition over existing atoms
+with explicit invariants and deterministic validation.
+
+Neutrality rule for this map: core invariants must remain vocabulary-level
+and deterministic; project-specific hardening posture belongs in declaration
+requirements/profiles and evaluation, never as silent global defaults.
+
+### 9.3 Layered Abstraction Strategy and Down-Construction Rules
+
+Abstractions must reduce downward without ambiguity:
+
+1. **Declaration layer (`declare`)** states intent in symbolic names and
+   minimum requirements.
+2. **Canonicalization layer** normalizes and derives canonical paths in
+   stable order.
+3. **Deterministic identity layer** derives domain-separated IDs from
+   `(kind, schema_version, canonical_path)`.
+4. **Core theory layer** materializes typed graph objects with full
+   referential closure.
+5. **Validation layer** enforces static invariants at construction and
+   semantic invariants at commit/graph validation.
+
+Deterministic down-construction rules:
+
+- **R1 (Order):** all collections are sorted before path or ID derivation.
+- **R2 (Domain separation):** ID derivation must include object-kind domain.
+- **R3 (Single source):** canonical path is the only allowed ID input path.
+- **R4 (No implicit inference):** if a requirement is not declared or
+  derivable by invariant rule, it is absent.
+- **R5 (Fail-fast gates):** each concretisation stage must halt on first
+  failed contract.
+- **R6 (Monotone hardening):** higher-layer abstractions may constrain
+  atoms further but may not relax atomic invariants.
+- **R7 (Binary validation):** first-principles conformance verdict is
+  boolean only (`TRUE` or `FALSE`), with `FALSE` forcing hardening mode.

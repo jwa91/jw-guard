@@ -168,7 +168,7 @@ fn violation_code_classifies_neutral_invariant() {
 #[test]
 fn violation_code_classifies_policy_profile_invariant() {
     assert_eq!(
-        ViolationCode::GateMissingVerification.classification(),
+        ViolationCode::ScopeCapabilityInvariant.classification(),
         ViolationClassification::PolicyProfileInvariant
     );
 }
@@ -466,11 +466,6 @@ fn model_validation_allows_non_airlock_signing_route_with_required_verification(
 
     let violations = validate_security_model(&model);
 
-    assert!(!has_violation(
-        &violations,
-        ViolationCode::GateMissingVerification,
-        ValidationSubject::Gate(gate_id(1)),
-    ));
     assert!(violations.is_empty());
 }
 

@@ -15,6 +15,7 @@ Read in order:
    declaration objects needed for that form.
 4. `03-deterministic-concretisation.md` - how declarations become canonical
    model referents and how observations are compared without hidden judgment.
+5. `04-loop-control.md` - deterministic control-loop gate for Goal/State/Loop/Mayrun.
 
 ## Core Principle
 

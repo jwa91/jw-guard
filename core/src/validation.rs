@@ -8,7 +8,7 @@ use crate::{
     enums::{
         Capability, CredentialMechanism, CredentialStrength, FailMode, GateVerdict, IdentityKind,
         IsolationMechanism, LayerHardness, LayerMechanism, PolicyStatus, SurfaceFacing, TrustBasis,
-        TrustLevel, VerificationKind, ZoneKind,
+        TrustLevel, ZoneKind,
     },
     id::{BoundaryId, CredentialId, IdentityId, PolicyId, RouteId, ScopeId, TrustId, ZoneId},
     scalars::AbsolutePath,
@@ -75,8 +75,6 @@ pub enum ViolationCode {
     RouteBoundaryMismatch,
     /// Route has no gate in any policy.
     RouteWithoutGate,
-    /// Gate is missing required verification.
-    GateMissingVerification,
     /// Identity violates its kind-specific invariants.
     IdentityKindInvariant,
     /// Scope violates zone-specific capability rules.
@@ -126,7 +124,6 @@ impl ViolationCode {
             | Self::QuarantineZoneTrust
             | Self::HighTrustBoundaryFailOpen
             | Self::BoundarySpecUnprotected
-            | Self::GateMissingVerification
             | Self::ScopeCapabilityInvariant
             | Self::RootOfflineCredentialMissing
             | Self::TrustGrantAuthorityMissing => ViolationClassification::PolicyProfileInvariant,
@@ -963,26 +960,6 @@ fn validate_policy_semantic(policy: &Policy, model: &SecurityModel) -> Vec<Viola
                 ValidationSubject::Policy(policy.id),
             ));
         }
-        if route_enters_kind(route, ZoneKind::Quarantine, model)
-            && !gate
-                .required_verifications
-                .contains(&VerificationKind::ContentScan)
-        {
-            violations.push(Violation::error(
-                ViolationCode::GateMissingVerification,
-                ValidationSubject::Gate(gate.id),
-            ));
-        }
-        if route_leaves_kind(route, ZoneKind::Signing, model)
-            && !gate
-                .required_verifications
-                .contains(&VerificationKind::SignatureValidity)
-        {
-            violations.push(Violation::error(
-                ViolationCode::GateMissingVerification,
-                ValidationSubject::Gate(gate.id),
-            ));
-        }
     }
     violations
 }
@@ -1126,24 +1103,6 @@ fn boundary_touches_high_trust(boundary: &Boundary, model: &SecurityModel) -> bo
             .map(|zone| matches!(zone.trust_level, TrustLevel::High | TrustLevel::Critical))
             .unwrap_or(false)
     })
-}
-
-fn route_enters_kind(route: &Route, kind: ZoneKind, model: &SecurityModel) -> bool {
-    let BoundaryEnd::Zone(id) = route.to_zone else {
-        return false;
-    };
-    find_zone(model, id)
-        .map(|zone| zone.kind == kind)
-        .unwrap_or(false)
-}
-
-fn route_leaves_kind(route: &Route, kind: ZoneKind, model: &SecurityModel) -> bool {
-    let BoundaryEnd::Zone(id) = route.from_zone else {
-        return false;
-    };
-    find_zone(model, id)
-        .map(|zone| zone.kind == kind)
-        .unwrap_or(false)
 }
 
 #[allow(dead_code)]
