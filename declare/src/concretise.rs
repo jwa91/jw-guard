@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 use jw_guard_core::{
     id::{
@@ -43,7 +43,17 @@ pub enum ConcretisationStage {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ConcretisationFailure {
     DeclarationViolations(Vec<DeclarationViolation>),
+    DeterministicIdCollisions(Vec<DeterministicIdCollision>),
     TheoryViolations(Vec<TheoryViolation>),
+}
+
+/// Deterministic-id collision detail.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct DeterministicIdCollision {
+    pub kind: DeterministicIdKind,
+    pub first_path: String,
+    pub second_path: String,
 }
 
 /// One concretisation stage result.
@@ -581,15 +591,20 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
 
     // Smoke-check deterministic id derivation with model path.
     let schema_version = &normalized.declaration_version;
-    let _model_id = derive_deterministic_id(
-        DeterministicIdKind::Model,
-        schema_version,
-        &paths.model,
-    );
+    let collisions = detect_deterministic_id_collisions(&paths, schema_version);
+    let ids_passed = collisions.is_empty();
     stages.push(ConcretisationStageResult {
         stage: ConcretisationStage::DeriveDeterministicIds,
-        passed: true,
+        passed: ids_passed,
     });
+    if !ids_passed {
+        return ConcretisationReport {
+            stages,
+            halted_at: Some(ConcretisationStage::DeriveDeterministicIds),
+            failure: Some(ConcretisationFailure::DeterministicIdCollisions(collisions)),
+            canonical_model: None,
+        };
+    }
 
     let canonical_model = build_canonical_model(normalized);
     stages.push(ConcretisationStageResult {
@@ -618,6 +633,61 @@ pub fn run_concretisation_loop(declaration: &SecurityDeclaration) -> Concretisat
         failure: None,
         canonical_model: Some(canonical_model),
     }
+}
+
+fn detect_deterministic_id_collisions(
+    paths: &CanonicalPaths,
+    schema_version: &SemVer,
+) -> Vec<DeterministicIdCollision> {
+    let mut seen: BTreeMap<(DeterministicIdKind, [u8; 16]), String> = BTreeMap::new();
+    let mut collisions = Vec::new();
+
+    let mut record = |kind: DeterministicIdKind, path: &str| {
+        let id = derive_deterministic_id(kind, schema_version, path);
+        let key = (kind, id);
+        if let Some(first) = seen.get(&key) {
+            if first != path {
+                collisions.push(DeterministicIdCollision {
+                    kind,
+                    first_path: first.clone(),
+                    second_path: path.to_owned(),
+                });
+            }
+        } else {
+            seen.insert(key, path.to_owned());
+        }
+    };
+
+    record(DeterministicIdKind::Model, &paths.model);
+    record(DeterministicIdKind::Actor, &paths.actor_system);
+    for (_, path) in &paths.zones {
+        record(DeterministicIdKind::Referent, path);
+    }
+    record(DeterministicIdKind::Referent, "referent/outside/default");
+    for (_, path) in &paths.boundaries {
+        record(DeterministicIdKind::Boundary, path);
+        record(DeterministicIdKind::Surface, &format!("{path}/surface/a"));
+        record(DeterministicIdKind::Surface, &format!("{path}/surface/b"));
+        record(DeterministicIdKind::Referent, path);
+    }
+    for (_, path) in &paths.routes {
+        record(DeterministicIdKind::Edge, path);
+        record(DeterministicIdKind::Referent, path);
+    }
+    for (_, path) in &paths.scopes {
+        record(DeterministicIdKind::Scope, path);
+    }
+    for (_, path) in &paths.policy_scopes {
+        record(DeterministicIdKind::Scope, path);
+    }
+    for (_, path) in &paths.policies {
+        record(DeterministicIdKind::Policy, path);
+    }
+    for (_, path) in &paths.requirements {
+        record(DeterministicIdKind::Requirement, path);
+    }
+
+    collisions
 }
 
 fn zone_path<'a>(paths: &'a CanonicalPaths, name: &DeclarationName) -> &'a str {
