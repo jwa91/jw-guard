@@ -15,6 +15,7 @@ use crate::{
         ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, SideDeclaration,
         SideLabel, SurfaceDeclaration, TypedScopeDeclaration, TypedValue,
     },
+    theory_validation::{validate_core_theory_library, CoreTheoryLibrary},
 };
 
 /// Ordered concept layers derived from the terminology baseline.
@@ -371,7 +372,7 @@ fn evaluate_evidence_atoms() -> LayerFeedback {
     let evidence_basis = NonEmptyVec::from_item(observation.id);
     let evaluation = EvaluationDeclaration {
         id: EvaluationId::from_bytes([33u8; 16]),
-        policy: PolicyId::from_bytes([34u8; 16]),
+        policy: PolicyId::from_bytes([22u8; 16]),
         evidence_basis,
         result: EvaluationResult::Unknown,
     };
@@ -379,6 +380,95 @@ fn evaluate_evidence_atoms() -> LayerFeedback {
         findings.push(AlignmentFinding::error(
             "EvidenceAtoms",
             "evidence atoms failed to produce deterministic evaluation declaration",
+        ));
+    }
+    let minimal_library = CoreTheoryLibrary {
+        model: ModelDeclaration {
+            id: ModelId::from_bytes([35u8; 16]),
+            version: crate::scalars::SemVer::new("1.0.0").expect("valid semver"),
+            declared_at: crate::scalars::UtcTimestamp::new("2026-01-01T00:00:00Z")
+                .expect("valid timestamp"),
+            declared_by: ActorId::from_bytes([36u8; 16]),
+        },
+        actors: alloc::vec![ActorDeclaration {
+            id: ActorId::from_bytes([36u8; 16]),
+            role: ActorRole::System,
+        }],
+        referents: alloc::vec![
+            ReferentDeclaration {
+                id: ReferentId::from_bytes([32u8; 16]),
+                sort: ReferentSort::ReleaseArtifact,
+            },
+            ReferentDeclaration {
+                id: ReferentId::from_bytes([37u8; 16]),
+                sort: ReferentSort::Boundary,
+            },
+        ],
+        boundaries: alloc::vec![BoundaryDeclaration::new(
+            BoundaryId::from_bytes([38u8; 16]),
+            SideDeclaration {
+                label: SideLabel::A,
+                anchor: ReferentId::from_bytes([37u8; 16]),
+            },
+            SideDeclaration {
+                label: SideLabel::B,
+                anchor: ReferentId::from_bytes([32u8; 16]),
+            },
+            SurfaceDeclaration {
+                id: SurfaceId::from_bytes([39u8; 16]),
+                boundary_id: BoundaryId::from_bytes([38u8; 16]),
+                facing: SideLabel::A,
+            },
+            SurfaceDeclaration {
+                id: SurfaceId::from_bytes([40u8; 16]),
+                boundary_id: BoundaryId::from_bytes([38u8; 16]),
+                facing: SideLabel::B,
+            },
+        )
+        .expect("coherent boundary")],
+        edges: alloc::vec![EdgeDeclaration::new(
+            EdgeId::from_bytes([41u8; 16]),
+            EdgeSort::CrossesBoundary,
+            ReferentId::from_bytes([37u8; 16]),
+            ReferentId::from_bytes([32u8; 16]),
+        )
+        .expect("coherent edge")],
+        scopes: alloc::vec![TypedScopeDeclaration {
+            id: ScopeId::from_bytes([20u8; 16]),
+            referent_sort: ReferentSort::ReleaseArtifact,
+            context: EvaluationContextDeclaration {
+                model_version: crate::scalars::SemVer::new("1.0.0").expect("valid semver"),
+                namespace: None,
+                boundary: None,
+                actor_authority: None,
+                snapshot_at: None,
+                evidence_source: None,
+            },
+            predicate: MembershipPredicateDeclaration::ReferentIds {
+                ids: NonEmptyVec::from_item(ReferentId::from_bytes([32u8; 16])),
+            },
+        }],
+        requirements: alloc::vec![RequirementDeclaration::new(
+            RequirementId::from_bytes([21u8; 16]),
+            RequirementSort::Count,
+            RequirementOperator::Count(crate::theory::CountOperator::Min),
+            TypedValue::U64(1),
+        )
+        .expect("coherent requirement")],
+        policies: alloc::vec![PolicyDeclaration {
+            id: PolicyId::from_bytes([22u8; 16]),
+            declared_by: ActorId::from_bytes([36u8; 16]),
+            scope: ScopeId::from_bytes([20u8; 16]),
+            requirement: RequirementId::from_bytes([21u8; 16]),
+        }],
+        evidence_sources: alloc::vec![source],
+        observations: alloc::vec![observation],
+        evaluations: alloc::vec![evaluation],
+    };
+    if !validate_core_theory_library(&minimal_library).is_empty() {
+        findings.push(AlignmentFinding::error(
+            "TheoryValidation",
+            "minimal theory library failed deterministic reference validation",
         ));
     }
     LayerFeedback::new(ConceptLayer::EvidenceAtoms, findings)

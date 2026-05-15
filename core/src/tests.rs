@@ -7,14 +7,30 @@ use crate::{
         Cadence, Capability, CredentialMechanism, CredentialStrength, FailMode, IdentityKind,
         IsolationMechanism, SurfaceFacing, TrustBasis, TrustLevel, ZoneKind,
     },
-    id::{BoundaryId, CredentialId, IdentityId, RouteId, ScopeId, SurfaceId, TrustId, ZoneId},
+    id::{
+        ActorId, BoundaryId, CredentialId, EdgeId, EvaluationId, EvidenceSourceId, IdentityId,
+        ObservationId, PolicyId, ReferentId, RequirementId, RouteId, ScopeId, SurfaceId, TrustId,
+        ZoneId,
+    },
     scalars::{
-        AbsolutePath, DisplayName, MediaType, NonEmptyVec, Port, SemVer, UtcTimestamp, ZonePurpose,
+        AbsolutePath, DisplayName, MediaType, NonEmptyString, NonEmptyVec, Port, SemVer,
+        UtcTimestamp, ZonePurpose,
     },
     structs::{
         Boundary, BoundaryEnd, Credential, CredentialBinding, CredentialLifecycle,
         CredentialMaterial, DeclarationMetadata, Identity, Route, RouteEndpoints, Scope, Surface,
         Trust, TrustGrant, TrustParties, Zone,
+    },
+    theory::{
+        ActorDeclaration, ActorRole, BoundaryDeclaration, EdgeDeclaration, EdgeSort,
+        EvaluationContextDeclaration, EvaluationDeclaration, EvaluationResult,
+        EvidenceSourceDeclaration, MembershipPredicateDeclaration, ModelDeclaration,
+        ObservationDeclaration, PolicyDeclaration, PresenceOperator, ReferentDeclaration,
+        ReferentSort, RequirementDeclaration, RequirementOperator, RequirementSort, SideDeclaration,
+        SideLabel, SurfaceDeclaration, TypedScopeDeclaration, TypedValue,
+    },
+    theory_validation::{
+        validate_core_theory_library, CoreTheoryLibrary, TheorySubject, TheoryViolationCode,
     },
     validation::{validate_security_model, ValidationSubject, Violation, ViolationCode},
 };
@@ -468,4 +484,143 @@ fn concept_feedback_loop_reaches_top_layer_when_core_atoms_exist() {
         .layers
         .iter()
         .all(|layer| layer.layer >= ConceptLayer::PrimitiveDatatypes && layer.passed()));
+}
+
+fn sample_core_theory_library() -> CoreTheoryLibrary {
+    let actor_id = ActorId::from_bytes([1u8; 16]);
+    let boundary_referent = ReferentId::from_bytes([2u8; 16]);
+    let artifact_referent = ReferentId::from_bytes([3u8; 16]);
+    let boundary_id = BoundaryId::from_bytes([4u8; 16]);
+    let scope_id = ScopeId::from_bytes([5u8; 16]);
+    let requirement_id = RequirementId::from_bytes([6u8; 16]);
+    let policy_id = PolicyId::from_bytes([7u8; 16]);
+    let source_id = EvidenceSourceId::from_bytes([8u8; 16]);
+    let observation_id = ObservationId::from_bytes([9u8; 16]);
+    let evaluation_id = EvaluationId::from_bytes([10u8; 16]);
+
+    CoreTheoryLibrary {
+        model: ModelDeclaration {
+            id: crate::id::ModelId::from_bytes([11u8; 16]),
+            version: SemVer::new("1.0.0").unwrap(),
+            declared_at: timestamp(),
+            declared_by: actor_id,
+        },
+        actors: vec![ActorDeclaration {
+            id: actor_id,
+            role: ActorRole::System,
+        }],
+        referents: vec![
+            ReferentDeclaration {
+                id: boundary_referent,
+                sort: ReferentSort::Boundary,
+            },
+            ReferentDeclaration {
+                id: artifact_referent,
+                sort: ReferentSort::ReleaseArtifact,
+            },
+        ],
+        boundaries: vec![
+            BoundaryDeclaration::new(
+                boundary_id,
+                SideDeclaration {
+                    label: SideLabel::A,
+                    anchor: boundary_referent,
+                },
+                SideDeclaration {
+                    label: SideLabel::B,
+                    anchor: artifact_referent,
+                },
+                SurfaceDeclaration {
+                    id: SurfaceId::from_bytes([12u8; 16]),
+                    boundary_id,
+                    facing: SideLabel::A,
+                },
+                SurfaceDeclaration {
+                    id: SurfaceId::from_bytes([13u8; 16]),
+                    boundary_id,
+                    facing: SideLabel::B,
+                },
+            )
+            .unwrap(),
+        ],
+        edges: vec![
+            EdgeDeclaration::new(
+                EdgeId::from_bytes([14u8; 16]),
+                EdgeSort::CrossesBoundary,
+                boundary_referent,
+                artifact_referent,
+            )
+            .unwrap(),
+        ],
+        scopes: vec![TypedScopeDeclaration {
+            id: scope_id,
+            referent_sort: ReferentSort::ReleaseArtifact,
+            context: EvaluationContextDeclaration {
+                model_version: SemVer::new("1.0.0").unwrap(),
+                namespace: None,
+                boundary: None,
+                actor_authority: None,
+                snapshot_at: None,
+                evidence_source: None,
+            },
+            predicate: MembershipPredicateDeclaration::ReferentIds {
+                ids: NonEmptyVec::from_item(artifact_referent),
+            },
+        }],
+        requirements: vec![
+            RequirementDeclaration::new(
+                requirement_id,
+                RequirementSort::Presence,
+                RequirementOperator::Presence(PresenceOperator::Required),
+                TypedValue::Bool(true),
+            )
+            .unwrap(),
+        ],
+        policies: vec![PolicyDeclaration {
+            id: policy_id,
+            declared_by: actor_id,
+            scope: scope_id,
+            requirement: requirement_id,
+        }],
+        evidence_sources: vec![EvidenceSourceDeclaration {
+            id: source_id,
+            source_type: NonEmptyString::new("scanner").unwrap(),
+            mapper: NonEmptyString::new("mapper-v1").unwrap(),
+            trust_assumption: NonEmptyString::new("signed feed").unwrap(),
+        }],
+        observations: vec![ObservationDeclaration {
+            id: observation_id,
+            source: source_id,
+            observed_referent: Some(artifact_referent),
+            observed_sort: ReferentSort::ReleaseArtifact,
+            at: timestamp(),
+            claim: TypedValue::Bool(true),
+        }],
+        evaluations: vec![EvaluationDeclaration {
+            id: evaluation_id,
+            policy: policy_id,
+            evidence_basis: NonEmptyVec::from_item(observation_id),
+            result: EvaluationResult::Unknown,
+        }],
+    }
+}
+
+#[test]
+fn core_theory_validation_accepts_minimal_coherent_library() {
+    let library = sample_core_theory_library();
+    let violations = validate_core_theory_library(&library);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn core_theory_validation_rejects_policy_missing_requirement_reference() {
+    let mut library = sample_core_theory_library();
+    library.policies[0].requirement = RequirementId::from_bytes([99u8; 16]);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::MissingReference
+            && violation.subject == TheorySubject::Policy(library.policies[0].id)
+    }));
 }

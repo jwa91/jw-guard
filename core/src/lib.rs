@@ -11,6 +11,7 @@ pub mod id;
 pub mod scalars;
 pub mod structs;
 pub mod theory;
+pub mod theory_validation;
 pub mod validation;
 
 #[cfg(test)]
@@ -24,4 +25,5 @@ pub use id::*;
 pub use scalars::*;
 pub use structs::*;
 pub use theory::*;
+pub use theory_validation::*;
 pub use validation::*;
