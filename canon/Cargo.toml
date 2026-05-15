@@ -1,0 +1,12 @@
+[package]
+name = "jw-guard-canon"
+description = "Deterministic canonicalization primitives for jw-guard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std"]
+std = []
