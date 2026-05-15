@@ -38,6 +38,7 @@ pub enum TheoryViolationCode {
     DuplicateId,
     MissingReference,
     ScopeSortMismatch,
+    ContextInvariant,
 }
 
 /// Theory-level validation violation.
@@ -123,6 +124,17 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
     violations.extend(validate_unique_observations(&library.observations));
     violations.extend(validate_unique_evaluations(&library.evaluations));
 
+    if !library
+        .actors
+        .iter()
+        .any(|actor| actor.id == library.model.declared_by)
+    {
+        violations.push(TheoryViolation::new(
+            TheoryViolationCode::MissingReference,
+            TheorySubject::Model,
+        ));
+    }
+
     for edge in &library.edges {
         if !library.referents.iter().any(|referent| referent.id == edge.from)
             || !library.referents.iter().any(|referent| referent.id == edge.to)
@@ -134,7 +146,30 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
         }
     }
 
+    for boundary in &library.boundaries {
+        if !library
+            .referents
+            .iter()
+            .any(|referent| referent.id == boundary.side_a.anchor)
+            || !library
+                .referents
+                .iter()
+                .any(|referent| referent.id == boundary.side_b.anchor)
+        {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::MissingReference,
+                TheorySubject::Boundary(boundary.id),
+            ));
+        }
+    }
+
     for scope in &library.scopes {
+        if scope.context.model_version != library.model.version {
+            violations.push(TheoryViolation::new(
+                TheoryViolationCode::ContextInvariant,
+                TheorySubject::Scope(scope.id),
+            ));
+        }
         if let MembershipPredicateDeclaration::ReferentIds { ids } = &scope.predicate {
             for referent_id in ids.as_slice() {
                 let referent = library
@@ -154,6 +189,25 @@ pub fn validate_core_theory_library(library: &CoreTheoryLibrary) -> Vec<TheoryVi
                         TheorySubject::Scope(scope.id),
                     ));
                 }
+            }
+        }
+        if let MembershipPredicateDeclaration::EdgeTo { to, .. } = &scope.predicate {
+            let referent = library
+                .referents
+                .iter()
+                .find(|candidate| candidate.id == *to);
+            let Some(referent) = referent else {
+                violations.push(TheoryViolation::new(
+                    TheoryViolationCode::MissingReference,
+                    TheorySubject::Scope(scope.id),
+                ));
+                continue;
+            };
+            if referent.sort != scope.referent_sort {
+                violations.push(TheoryViolation::new(
+                    TheoryViolationCode::ScopeSortMismatch,
+                    TheorySubject::Scope(scope.id),
+                ));
             }
         }
     }

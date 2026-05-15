@@ -624,3 +624,58 @@ fn core_theory_validation_rejects_policy_missing_requirement_reference() {
             && violation.subject == TheorySubject::Policy(library.policies[0].id)
     }));
 }
+
+#[test]
+fn core_theory_validation_rejects_model_declared_by_missing_actor() {
+    let mut library = sample_core_theory_library();
+    library.model.declared_by = ActorId::from_bytes([99u8; 16]);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::MissingReference
+            && violation.subject == TheorySubject::Model
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_boundary_with_missing_anchor_referent() {
+    let mut library = sample_core_theory_library();
+    library.boundaries[0].side_a.anchor = ReferentId::from_bytes([99u8; 16]);
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::MissingReference
+            && violation.subject == TheorySubject::Boundary(library.boundaries[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_scope_context_version_mismatch() {
+    let mut library = sample_core_theory_library();
+    library.scopes[0].context.model_version = SemVer::new("9.9.9").unwrap();
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::ContextInvariant
+            && violation.subject == TheorySubject::Scope(library.scopes[0].id)
+    }));
+}
+
+#[test]
+fn core_theory_validation_rejects_edge_to_predicate_with_missing_referent() {
+    let mut library = sample_core_theory_library();
+    library.scopes[0].predicate = MembershipPredicateDeclaration::EdgeTo {
+        edge_sort: EdgeSort::CrossesBoundary,
+        to: ReferentId::from_bytes([88u8; 16]),
+    };
+
+    let violations = validate_core_theory_library(&library);
+
+    assert!(violations.iter().any(|violation| {
+        violation.code == TheoryViolationCode::MissingReference
+            && violation.subject == TheorySubject::Scope(library.scopes[0].id)
+    }));
+}
