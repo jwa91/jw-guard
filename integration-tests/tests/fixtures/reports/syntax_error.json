@@ -1,0 +1,21 @@
+{
+  "report_version": "1",
+  "outcome": "syntax_error",
+  "input": {
+    "path": "__PATH__",
+    "format": "json"
+  },
+  "stage_reached": "syntax",
+  "errors": [
+    {
+      "stage": "syntax",
+      "code": "INVALID_SHAPE",
+      "path": [],
+      "message": "EOF while parsing an object at line 1 column 1",
+      "source": {
+        "line": 1,
+        "column": 1
+      }
+    }
+  ]
+}

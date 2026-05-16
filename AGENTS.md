@@ -75,3 +75,11 @@ Use it to preserve strictness and avoid semantic drift.
 - [ ] Outcome semantics remain uncertainty-preserving (no forced bool-only collapse).
 - [ ] Tests describe exactly what they validate (no over-claims).
 
+## Recent CLI/Adapter Learnings
+
+- When reporting parser locations, never reinterpret byte offsets as line/column coordinates.
+  - In particular, `toml::de::Error::span()` is a byte range; if source text is unavailable for conversion, emit no location rather than inaccurate coordinates.
+- Keep adapter stage handling aligned with actual adapter APIs.
+  - `parse()` returns syntax/shape errors; declare conversion errors are produced in `DeclaredSpec::try_from(wire)`.
+  - Avoid unreachable error-match arms that imply stage behavior the code path cannot produce.
+

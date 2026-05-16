@@ -1,5 +1,5 @@
 [workspace]
-members = ["core", "canon", "declare", "eval", "wire", "adapter-json", "adapter-yaml", "adapter-toml", "integration-tests"]
+members = ["core", "canon", "declare", "eval", "wire", "adapter-json", "adapter-yaml", "adapter-toml", "integration-tests", "cli"]
 resolver = "2"
 
 [workspace.package]
