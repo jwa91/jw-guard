@@ -90,10 +90,7 @@ fn parse_to_spec_reports_wire_error_for_invalid_symbolic_name() {
     model.insert("name".to_owned(), Value::String("InvalidName".to_owned()));
     let json_bytes = serde_json::to_vec(&json).expect("json should serialize");
 
-    assert!(matches!(
-        jw_guard_adapter_json::parse(&json_bytes),
-        Ok(_)
-    ));
+    assert!(jw_guard_adapter_json::parse(&json_bytes).is_ok());
     assert!(matches!(
         jw_guard_adapter_json::parse_to_spec(&json_bytes),
         Err(jw_guard_adapter_json::AdapterError::Wire(_))
