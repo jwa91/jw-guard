@@ -9,8 +9,9 @@ repository.workspace = true
 
 [features]
 default = ["std"]
-std = ["jw-guard-core/std", "jw-guard-canon/std"]
+std = ["jw-guard-core/std", "jw-guard-canon/std", "jw-guard-mapper/std"]
 
 [dependencies]
 jw-guard-core = { path = "../core", default-features = false }
 jw-guard-canon = { path = "../canon", default-features = false }
+jw-guard-mapper = { path = "../mapper", default-features = false }

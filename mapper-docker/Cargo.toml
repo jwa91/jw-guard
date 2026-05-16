@@ -1,0 +1,15 @@
+[package]
+name = "jw-guard-mapper-docker"
+description = "Docker Compose mapper for neutral jw-guard evidence."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+jw-guard-core = { path = "../core" }
+jw-guard-mapper = { path = "../mapper" }
+jw-guard-vocab-docker = { path = "../vocab-docker" }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"

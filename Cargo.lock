@@ -248,6 +248,10 @@ dependencies = [
  "jw-guard-canon",
  "jw-guard-core",
  "jw-guard-declare",
+ "jw-guard-eval",
+ "jw-guard-mapper",
+ "jw-guard-mapper-docker",
+ "jw-guard-policy-docker",
  "jw-guard-wire",
  "serde",
  "serde_json",
@@ -276,6 +280,7 @@ version = "0.1.0"
 dependencies = [
  "jw-guard-canon",
  "jw-guard-core",
+ "jw-guard-mapper",
 ]
 
 [[package]]
@@ -299,6 +304,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "jw-guard-mapper-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+ "jw-guard-mapper",
+ "jw-guard-vocab-docker",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "jw-guard-policy-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+ "jw-guard-eval",
+ "jw-guard-mapper",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "jw-guard-vocab-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+]
+
+[[package]]
 name = "jw-guard-wire"
 version = "0.1.0"
 dependencies = [
@@ -307,6 +341,7 @@ dependencies = [
  "jw-guard-adapter-yaml",
  "jw-guard-core",
  "jw-guard-declare",
+ "jw-guard-mapper",
  "schemars",
  "serde",
  "serde_json",
