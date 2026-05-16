@@ -16,7 +16,11 @@ clap = { version = "4", features = ["derive"] }
 jw-guard-adapter-json = { path = "../adapter-json" }
 jw-guard-adapter-toml = { path = "../adapter-toml" }
 jw-guard-adapter-yaml = { path = "../adapter-yaml" }
+jw-guard-core = { path = "../core" }
 jw-guard-declare = { path = "../declare", features = ["std"] }
+jw-guard-eval = { path = "../eval" }
+jw-guard-mapper = { path = "../mapper" }
+jw-guard-mapper-docker = { path = "../mapper-docker" }
 jw-guard-wire = { path = "../wire" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -24,4 +28,3 @@ serde_yaml = "0.9"
 
 [dev-dependencies]
 jw-guard-canon = { path = "../canon" }
-jw-guard-core = { path = "../core" }

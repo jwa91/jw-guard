@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 mod error_map;
+mod evaluate;
 mod output_human;
 mod output_json;
 mod report;
@@ -14,6 +15,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
+use crate::evaluate::{evaluate_docker_compose_bool_property, EvaluateFailure};
 use crate::output_human::render_human_report;
 use crate::output_json::render_json_report;
 use crate::report::{OutputFormat, StageStop};
@@ -39,6 +41,10 @@ enum Command {
         #[arg(long = "output", alias = "format", value_enum)]
         output: Option<OutputArg>,
     },
+    Evaluate {
+        #[command(subcommand)]
+        command: EvaluateCommand,
+    },
     Schema {
         #[command(subcommand)]
         command: SchemaCommand,
@@ -48,6 +54,24 @@ enum Command {
 #[derive(Debug, clap::Subcommand)]
 enum SchemaCommand {
     Emit,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum EvaluateCommand {
+    DockerCompose {
+        #[arg(long = "compose")]
+        compose: PathBuf,
+        #[arg(long = "subject")]
+        subject: String,
+        #[arg(long = "property")]
+        property: String,
+        #[arg(long = "expect-bool")]
+        expect_bool: bool,
+        #[arg(long = "observed-at-unix-seconds", default_value_t = 0)]
+        observed_at_unix_seconds: u64,
+        #[arg(long = "output", alias = "format", value_enum)]
+        output: Option<OutputArg>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -146,7 +170,64 @@ where
                 }
                 Err(error) => {
                     let _ = writeln!(stderr, "{error}");
-                    if error.is_io() { 3 } else { 1 }
+                    if error.is_io() {
+                        3
+                    } else {
+                        1
+                    }
+                }
+            }
+        }
+        Command::Evaluate {
+            command:
+                EvaluateCommand::DockerCompose {
+                    compose,
+                    subject,
+                    property,
+                    expect_bool,
+                    observed_at_unix_seconds,
+                    output,
+                },
+        } => {
+            let output_mode = output.map(OutputFormat::from).unwrap_or_else(|| {
+                if stdout_is_tty {
+                    OutputFormat::Human
+                } else {
+                    OutputFormat::Json
+                }
+            });
+            match evaluate_docker_compose_bool_property(
+                &compose,
+                &subject,
+                &property,
+                expect_bool,
+                observed_at_unix_seconds,
+            ) {
+                Ok(report) => {
+                    if output_mode == OutputFormat::Json {
+                        let _ = serde_json::to_writer_pretty(&mut *stdout, &report);
+                        let _ = writeln!(stdout);
+                    } else {
+                        let _ = writeln!(
+                            stderr,
+                            "{}: {}.{} expected={} outcome={} reason={}",
+                            report.kind,
+                            report.subject,
+                            report.property,
+                            report.expected_bool,
+                            report.outcome,
+                            report.reason
+                        );
+                    }
+                    0
+                }
+                Err(error) => {
+                    let _ = writeln!(stderr, "{error}");
+                    if matches!(error, EvaluateFailure::Io(_)) {
+                        3
+                    } else {
+                        1
+                    }
                 }
             }
         }
