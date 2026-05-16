@@ -1,0 +1,15 @@
+# Default ownership for all paths.
+* @jwa91
+
+# Core deterministic model and declaration stack.
+/core/** @jwa91
+/canon/** @jwa91
+/declare/** @jwa91
+/wire/** @jwa91
+
+# Build, CI, and policy control surfaces.
+/.github/workflows/** @jwa91
+/Cargo.toml @jwa91
+/Cargo.lock @jwa91
+/Makefile @jwa91
+/AGENTS.md @jwa91
