@@ -12,7 +12,14 @@ Current workspace:
 ```
 jw-guard (workspace)
 ├── core/        -- type-only model kernel (IDs, scalars, enums, structs, composites, validation)
-└── canon/       -- deterministic canonicalization primitives (paths, ordering, IDs, normalization)
+├── canon/       -- deterministic canonicalization primitives (paths, ordering, IDs, normalization)
+├── declare/     -- symbolic declaration layer and deterministic concretisation
+├── eval/        -- uncertainty-preserving policy evaluation primitives
+├── mapper/      -- neutral deterministic source-fact mapping contract
+├── wire/        -- strict DTO boundary and schema export
+├── adapter-*/   -- syntax-only JSON/YAML/TOML adapters
+├── cli/         -- contract-first validation CLI
+└── integration-tests/
 ```
 
 Current stable properties:
@@ -21,6 +28,8 @@ Current stable properties:
 - `core` does not encode project policy posture defaults.
 - evaluation semantics keep uncertainty states (no forced bool-only collapse).
 - `canon` provides deterministic path/order/ID/normalization foundations for concretization.
+- mappers translate source facts into neutral observations; policy meaning
+  remains in declarations and evaluation.
 
 ## Goal and Roadmap
 

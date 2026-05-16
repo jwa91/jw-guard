@@ -292,6 +292,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jw-guard-mapper"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+]
+
+[[package]]
 name = "jw-guard-wire"
 version = "0.1.0"
 dependencies = [

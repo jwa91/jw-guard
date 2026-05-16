@@ -41,6 +41,9 @@ Drafts and historical exploration notes never outrank the four documents above.
 - [ADR-0005 — Uncertainty-preserving evaluation outcomes](docs/adr/0005-uncertainty-preserving-outcomes.md):
   evaluation outcomes preserve `Unknown` and `NotApplicable`; never collapse
   to `bool`; validation accumulates.
+- [ADR-0006 — Neutral deterministic mapper contract](docs/adr/0006-neutral-mapper-contract.md):
+ mappers translate source facts into neutral observations; they must not emit
+ policy verdicts or threshold-derived posture tags.
 
 ## Hard constraints (do not violate)
 
@@ -70,6 +73,9 @@ contest the rule.
    and `NotApplicable` available; no public API in `core` or `eval` collapses
    a policy decision to `bool`. Validation surfaces accumulate violations.
    *(ADR-0005)*
+8. **Neutral mapping.** Mappers translate external source facts into neutral
+ observations. They must not own policy posture, threshold choices, or
+ enforcement outcomes. *(ADR-0006)*
 
 ## Style for core changes
 

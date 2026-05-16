@@ -22,6 +22,7 @@ be revisited.
 | 0003 | [Three orthogonal axes: type, graph, observation](0003-three-orthogonal-axes.md) | Accepted |
 | 0004 | [Format adapters are syntax-only; declarers own policy vocabulary](0004-syntax-only-format-adapters.md) | Accepted |
 | 0005 | [Uncertainty-preserving evaluation outcomes](0005-uncertainty-preserving-outcomes.md) | Accepted |
+| 0006 | [Neutral deterministic mapper contract](0006-neutral-mapper-contract.md) | Accepted |
 
 ## Adding an ADR
 
