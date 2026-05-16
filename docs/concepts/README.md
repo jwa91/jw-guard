@@ -32,7 +32,7 @@ Interpretation rules:
 Goal:
 
 - Keep concepts as a strict, minimal, deterministic authority aligned to the
-  active implementation (`core` + `canon`) and the non-opinionated north star.
+  active implementation and the non-opinionated north star.
 
 Roadmap:
 
