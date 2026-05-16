@@ -154,6 +154,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "jw-guard-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-adapter-json",
+ "jw-guard-adapter-toml",
+ "jw-guard-adapter-yaml",
+ "jw-guard-core",
+ "jw-guard-declare",
+]
+
+[[package]]
 name = "jw-guard-wire"
 version = "0.1.0"
 dependencies = [

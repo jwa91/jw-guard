@@ -1,0 +1,15 @@
+[package]
+name = "jw-guard-integration-tests"
+description = "End-to-end pipeline integration tests for jw-guard."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dev-dependencies]
+jw-guard-adapter-json = { path = "../adapter-json" }
+jw-guard-adapter-yaml = { path = "../adapter-yaml" }
+jw-guard-adapter-toml = { path = "../adapter-toml" }
+jw-guard-core = { path = "../core" }
+jw-guard-declare = { path = "../declare", features = ["std"] }
