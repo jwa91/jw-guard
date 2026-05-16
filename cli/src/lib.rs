@@ -65,7 +65,7 @@ enum EvaluateCommand {
         subject: String,
         #[arg(long = "property")]
         property: String,
-        #[arg(long = "expect-bool")]
+        #[arg(long = "expect-bool", action = clap::ArgAction::Set)]
         expect_bool: bool,
         #[arg(long = "observed-at-unix-seconds", default_value_t = 0)]
         observed_at_unix_seconds: u64,
