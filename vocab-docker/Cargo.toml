@@ -1,0 +1,15 @@
+[package]
+name = "jw-guard-vocab-docker"
+description = "Neutral Docker vocabulary constants for jw-guard mappers."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["std"]
+std = ["jw-guard-core/std"]
+
+[dependencies]
+jw-guard-core = { path = "../core", default-features = false }
