@@ -6,6 +6,7 @@ members = [
     "eval",
     "mapper",
     "mapper-docker",
+    "policy-docker",
     "wire",
     "vocab-docker",
     "adapter-json",

@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, ValueEnum};
 
-use crate::evaluate::{evaluate_docker_compose_bool_property, EvaluateFailure};
+use crate::evaluate::{evaluate_docker_compose, EvaluateFailure};
 use crate::output_human::render_human_report;
 use crate::output_json::render_json_report;
 use crate::report::{OutputFormat, StageStop};
@@ -61,12 +61,15 @@ enum EvaluateCommand {
     DockerCompose {
         #[arg(long = "compose")]
         compose: PathBuf,
-        #[arg(long = "subject")]
-        subject: String,
-        #[arg(long = "property")]
-        property: String,
-        #[arg(long = "expect-bool", action = clap::ArgAction::Set)]
-        expect_bool: bool,
+        /// Declared property-requirement policy (narrow docker YAML format).
+        #[arg(long, conflicts_with_all = ["subject", "property", "expect_bool"])]
+        policy: Option<PathBuf>,
+        #[arg(long, conflicts_with = "policy")]
+        subject: Option<String>,
+        #[arg(long, conflicts_with = "policy")]
+        property: Option<String>,
+        #[arg(long = "expect-bool", conflicts_with = "policy", action = clap::ArgAction::Set)]
+        expect_bool: Option<bool>,
         #[arg(long = "observed-at-unix-seconds", default_value_t = 0)]
         observed_at_unix_seconds: u64,
         #[arg(long = "output", alias = "format", value_enum)]
@@ -182,6 +185,7 @@ where
             command:
                 EvaluateCommand::DockerCompose {
                     compose,
+                    policy,
                     subject,
                     property,
                     expect_bool,
@@ -196,10 +200,11 @@ where
                     OutputFormat::Json
                 }
             });
-            match evaluate_docker_compose_bool_property(
+            match evaluate_docker_compose(
                 &compose,
-                &subject,
-                &property,
+                policy.as_deref(),
+                subject.as_deref(),
+                property.as_deref(),
                 expect_bool,
                 observed_at_unix_seconds,
             ) {
@@ -225,6 +230,8 @@ where
                     let _ = writeln!(stderr, "{error}");
                     if matches!(error, EvaluateFailure::Io(_)) {
                         3
+                    } else if matches!(error, EvaluateFailure::InvalidEvaluateArgs(_)) {
+                        2
                     } else {
                         1
                     }

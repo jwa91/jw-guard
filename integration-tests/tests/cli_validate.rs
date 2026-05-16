@@ -294,3 +294,48 @@ services:
     assert_eq!(report["outcome"], "violated");
     assert_eq!(report["reason"], "property_violated");
 }
+
+#[test]
+fn evaluate_docker_compose_accepts_declared_policy_file() {
+    let compose = r#"
+services:
+  web:
+    image: nginx
+    privileged: true
+"#;
+    let policy = r#"
+property_requirements:
+  - subject: web
+    property: privileged
+    expected_bool: false
+"#;
+    let compose_path = write_temp(compose, "yaml");
+    let policy_path = write_temp(policy, "yaml");
+    let compose_text = compose_path.to_string_lossy().to_string();
+    let policy_text = policy_path.to_string_lossy().to_string();
+    let (code, stdout, stderr) = run_cli(
+        &[
+            "evaluate",
+            "docker-compose",
+            "--compose",
+            &compose_text,
+            "--policy",
+            &policy_text,
+            "--output",
+            "json",
+        ],
+        false,
+    );
+    let _ = fs::remove_file(compose_path);
+    let _ = fs::remove_file(policy_path);
+
+    assert_eq!(code, 0);
+    assert!(stderr.is_empty());
+    let report: Value = parse_report(&stdout);
+    assert_eq!(report["kind"], "docker_compose_property");
+    assert_eq!(report["subject"], "web");
+    assert_eq!(report["property"], "privileged");
+    assert_eq!(report["expected_bool"], false);
+    assert_eq!(report["outcome"], "violated");
+    assert_eq!(report["reason"], "property_violated");
+}

@@ -1,0 +1,15 @@
+[package]
+name = "jw-guard-policy-docker"
+description = "Docker domain policy authoring (YAML) to declared property requirements."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+jw-guard-core = { path = "../core" }
+jw-guard-eval = { path = "../eval" }
+jw-guard-mapper = { path = "../mapper" }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"

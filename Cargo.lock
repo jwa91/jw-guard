@@ -251,6 +251,7 @@ dependencies = [
  "jw-guard-eval",
  "jw-guard-mapper",
  "jw-guard-mapper-docker",
+ "jw-guard-policy-docker",
  "jw-guard-wire",
  "serde",
  "serde_json",
@@ -309,6 +310,17 @@ dependencies = [
  "jw-guard-core",
  "jw-guard-mapper",
  "jw-guard-vocab-docker",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "jw-guard-policy-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+ "jw-guard-eval",
+ "jw-guard-mapper",
  "serde",
  "serde_yaml",
 ]

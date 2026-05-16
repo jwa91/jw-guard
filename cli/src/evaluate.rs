@@ -8,26 +8,31 @@ use jw_guard_eval::{
 };
 use jw_guard_mapper::{MappedValue, Mapper};
 use jw_guard_mapper_docker::DockerComposeMapper;
+use jw_guard_policy_docker::PolicyDockerError;
 use serde::Serialize;
 
 #[derive(Debug)]
 pub enum EvaluateFailure {
     Io(std::io::Error),
+    InvalidEvaluateArgs(&'static str),
     InvalidCanonicalName {
         field: &'static str,
         source: jw_guard_core::ScalarViolation,
     },
     Map(jw_guard_mapper::MapError),
+    DockerPolicy(PolicyDockerError),
 }
 
 impl fmt::Display for EvaluateFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Io(error) => write!(f, "i/o error: {error}"),
+            Self::InvalidEvaluateArgs(message) => f.write_str(message),
             Self::InvalidCanonicalName { field, source } => {
                 write!(f, "invalid canonical name for {field}: {source}")
             }
             Self::Map(error) => write!(f, "mapping failed: {error:?}"),
+            Self::DockerPolicy(error) => write!(f, "{error}"),
         }
     }
 }
@@ -45,26 +50,60 @@ pub struct EvaluateReport {
     pub reason: &'static str,
 }
 
-pub fn evaluate_docker_compose_bool_property(
+pub fn evaluate_docker_compose(
     compose_path: &Path,
-    subject: &str,
-    property: &str,
-    expected: bool,
+    policy_path: Option<&Path>,
+    subject: Option<&str>,
+    property: Option<&str>,
+    expect_bool: Option<bool>,
     observed_at_unix_seconds: u64,
 ) -> Result<EvaluateReport, EvaluateFailure> {
+    let requirement = match (policy_path, subject, property, expect_bool) {
+        (Some(policy_path), None, None, None) => {
+            let text = std::fs::read_to_string(policy_path).map_err(EvaluateFailure::Io)?;
+            jw_guard_policy_docker::property_requirement_from_yaml(&text).map_err(EvaluateFailure::DockerPolicy)?
+        }
+        (
+            None,
+            Some(subject),
+            Some(property),
+            Some(expect_bool),
+        ) => PropertyRequirement::new(
+            parse_name("subject", subject)?,
+            parse_name("property", property)?,
+            MappedValue::Bool(expect_bool),
+        ),
+        (Some(_), _, _, _) => {
+            return Err(EvaluateFailure::InvalidEvaluateArgs(
+                "`--policy` cannot be combined with `--subject`, `--property`, or `--expect-bool`",
+            ))
+        }
+        _ => Err(EvaluateFailure::InvalidEvaluateArgs(
+            "supply `--policy POLICY.yaml` or all of `--subject`, `--property`, and `--expect-bool`",
+        ))?,
+    };
+
     let input = std::fs::read_to_string(compose_path).map_err(EvaluateFailure::Io)?;
-    let subject = parse_name("subject", subject)?;
-    let property = parse_name("property", property)?;
+
     let mapper = DockerComposeMapper::new(Timestamp::from_unix_seconds(observed_at_unix_seconds));
     let evidence = mapper.map(&input).map_err(EvaluateFailure::Map)?;
-    let requirement = PropertyRequirement::new(
-        subject.clone(),
-        property.clone(),
-        MappedValue::Bool(expected),
-    );
     let evaluation = evaluate_property_requirement(&requirement, &evidence);
 
-    Ok(report(subject, property, expected, evaluation))
+    Ok(report(
+        requirement.subject().clone(),
+        requirement.property().clone(),
+        bool_expectation(requirement.expected())?,
+        evaluation,
+    ))
+}
+
+fn bool_expectation(expected: &MappedValue) -> Result<bool, EvaluateFailure> {
+    match expected {
+        MappedValue::Bool(value) => Ok(*value),
+        _ => Err(EvaluateFailure::InvalidEvaluateArgs(
+            "internal error: CLI evaluation expects bool property requirements only",
+        )),
+    }
 }
 
 fn parse_name(field: &'static str, value: &str) -> Result<CanonicalName, EvaluateFailure> {
