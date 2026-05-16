@@ -300,6 +300,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "jw-guard-mapper-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+ "jw-guard-mapper",
+ "jw-guard-vocab-docker",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "jw-guard-vocab-docker"
+version = "0.1.0"
+dependencies = [
+ "jw-guard-core",
+]
+
+[[package]]
 name = "jw-guard-wire"
 version = "0.1.0"
 dependencies = [
