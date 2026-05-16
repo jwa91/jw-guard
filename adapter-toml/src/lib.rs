@@ -129,9 +129,21 @@ fn convert_table(path: String, table: toml::map::Map<String, toml::Value>) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jw_guard_wire::ExplicitOptionWire;
+    use serde::Deserialize;
 
     fn parse_toml(input: &str) -> toml::Value {
         toml::from_str(input).expect("test TOML should parse")
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct ExplicitOptionCarrier {
+        #[serde(default)]
+        unspecified: ExplicitOptionWire<u64>,
+        #[serde(default)]
+        none: ExplicitOptionWire<u64>,
+        #[serde(default)]
+        some: ExplicitOptionWire<u64>,
     }
 
     #[test]
@@ -182,5 +194,22 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn bridge_supports_explicit_option_tri_state_for_toml_convention() {
+        let value = parse_toml(
+            r#"
+none = { "@none" = true }
+some = 7
+"#,
+        );
+        let bridged = bridge_toml_to_json("$".to_string(), value).expect("bridge should succeed");
+        let decoded: ExplicitOptionCarrier =
+            serde_json::from_value(bridged).expect("decoded carrier should deserialize");
+
+        assert!(matches!(decoded.unspecified, ExplicitOptionWire::Unspecified));
+        assert!(matches!(decoded.none, ExplicitOptionWire::ExplicitNone));
+        assert!(matches!(decoded.some, ExplicitOptionWire::ExplicitSome(7)));
     }
 }

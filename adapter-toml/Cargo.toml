@@ -12,3 +12,6 @@ jw-guard-declare = { path = "../declare", default-features = false, features = [
 jw-guard-wire = { path = "../wire" }
 serde_json = "1"
 toml = "0.8"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
