@@ -11,3 +11,4 @@ repository.workspace = true
 jw-guard-declare = { path = "../declare", default-features = false, features = ["std"] }
 jw-guard-wire = { path = "../wire" }
 serde_yaml = "0.9"
+yaml-rust2 = "0.8"
