@@ -29,6 +29,11 @@ impl std::error::Error for SymbolicNameError {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeclareError {
     ValidationFailed(Vec<crate::validation::ValidationError>),
+    InvalidSymbolicName {
+        path: String,
+        value: String,
+        source: SymbolicNameError,
+    },
     CanonicalPath(jw_guard_canon::CanonicalPathError),
     DeterministicId(jw_guard_canon::DeterministicIdError),
     InvalidCanonicalName(jw_guard_core::ScalarViolation),
@@ -46,6 +51,14 @@ impl fmt::Display for DeclareError {
             Self::ValidationFailed(errors) => {
                 write!(f, "spec validation failed with {} error(s)", errors.len())
             }
+            Self::InvalidSymbolicName {
+                path,
+                value,
+                source,
+            } => write!(
+                f,
+                "invalid symbolic name at {path}: '{value}' ({source})"
+            ),
             Self::CanonicalPath(error) => write!(f, "canonical path derivation failed: {error}"),
             Self::DeterministicId(error) => write!(f, "deterministic id derivation failed: {error}"),
             Self::InvalidCanonicalName(error) => write!(f, "canonical name conversion failed: {error}"),

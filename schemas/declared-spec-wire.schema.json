@@ -1,0 +1,482 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "WireActorSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "role"
+      ],
+      "type": "object"
+    },
+    "WireBoundarySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "side_a_anchor": {
+          "type": "string"
+        },
+        "side_b_anchor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "side_a_anchor",
+        "side_b_anchor"
+      ],
+      "type": "object"
+    },
+    "WireDirection": {
+      "enum": [
+        "directed",
+        "undirected"
+      ],
+      "type": "string"
+    },
+    "WireEdgeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "$ref": "#/definitions/WireDirection"
+        },
+        "first": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "second": {
+          "type": "string"
+        },
+        "sort": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "direction",
+        "first",
+        "name",
+        "second",
+        "sort"
+      ],
+      "type": "object"
+    },
+    "WireModelSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_at_unix_seconds": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "declared_by": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "$ref": "#/definitions/WireVersionSpec"
+        }
+      },
+      "required": [
+        "declared_at_unix_seconds",
+        "declared_by",
+        "name",
+        "version"
+      ],
+      "type": "object"
+    },
+    "WirePolicySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_by": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "declared_by",
+        "name",
+        "requirement",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "WireReferentSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sort": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "sort"
+      ],
+      "type": "object"
+    },
+    "WireRequirementOperator": {
+      "enum": [
+        "presence_required",
+        "presence_forbidden",
+        "presence_optional",
+        "count_equal",
+        "count_min",
+        "count_max",
+        "set_includes",
+        "set_excludes",
+        "set_equals",
+        "temporal_before",
+        "temporal_after",
+        "temporal_within",
+        "relation_exists",
+        "relation_not_exists",
+        "relation_path_length_max",
+        "relation_edge_count_max"
+      ],
+      "type": "string"
+    },
+    "WireRequirementSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "operator": {
+          "$ref": "#/definitions/WireRequirementOperator"
+        },
+        "sort": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "value": {
+          "$ref": "#/definitions/WireRequirementValueSpec"
+        }
+      },
+      "required": [
+        "name",
+        "operator",
+        "sort",
+        "value"
+      ],
+      "type": "object"
+    },
+    "WireRequirementValueSpec": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "bool"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "u64"
+              ],
+              "type": "string"
+            },
+            "value": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "name"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "names"
+              ],
+              "type": "string"
+            },
+            "names": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "names"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "duration_seconds"
+              ],
+              "type": "string"
+            },
+            "seconds": {
+              "format": "uint64",
+              "minimum": 0.0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "seconds"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WireScopePredicateSpec": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "has_tag"
+              ],
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "name_equals"
+              ],
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "WireScopeSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "mapper_version": {
+          "$ref": "#/definitions/WireVersionSpec"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "predicate": {
+          "$ref": "#/definitions/WireScopePredicateSpec"
+        },
+        "referent_sort": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "snapshot_unix_seconds": {
+          "format": "uint64",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mapper_version",
+        "name",
+        "namespace",
+        "predicate",
+        "referent_sort",
+        "snapshot_unix_seconds"
+      ],
+      "type": "object"
+    },
+    "WireVersionSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "major": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "minor": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        },
+        "patch": {
+          "format": "uint16",
+          "minimum": 0.0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "type": "object"
+    }
+  },
+  "properties": {
+    "actors": {
+      "items": {
+        "$ref": "#/definitions/WireActorSpec"
+      },
+      "type": "array"
+    },
+    "boundaries": {
+      "items": {
+        "$ref": "#/definitions/WireBoundarySpec"
+      },
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/definitions/WireEdgeSpec"
+      },
+      "type": "array"
+    },
+    "model": {
+      "$ref": "#/definitions/WireModelSpec"
+    },
+    "policies": {
+      "items": {
+        "$ref": "#/definitions/WirePolicySpec"
+      },
+      "type": "array"
+    },
+    "referents": {
+      "items": {
+        "$ref": "#/definitions/WireReferentSpec"
+      },
+      "type": "array"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/definitions/WireRequirementSpec"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "scopes": {
+      "items": {
+        "$ref": "#/definitions/WireScopeSpec"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "actors",
+    "boundaries",
+    "edges",
+    "model",
+    "policies",
+    "referents",
+    "requirements",
+    "schema_version",
+    "scopes"
+  ],
+  "title": "WireDeclaredSpec",
+  "type": "object"
+}
