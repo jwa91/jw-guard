@@ -1,0 +1,53 @@
+schema_version: v1
+model:
+  name: security
+  version:
+    major: 1
+    minor: 2
+    patch: 3
+  declared_at_unix_seconds: 1700000000
+  declared_by: owner
+actors:
+  - name: service
+    role: workload
+  - name: owner
+    role: operator
+referents:
+  - name: database
+    sort: 2
+  - name: frontend
+    sort: 1
+boundaries:
+  - name: public
+    side_a_anchor: frontend
+    side_b_anchor: database
+edges:
+  - name: calls
+    sort: 3
+    direction: directed
+    first: frontend
+    second: database
+scopes:
+  - name: external
+    referent_sort: 1
+    snapshot_unix_seconds: 1700000050
+    namespace: prod
+    mapper_version:
+      major: 1
+      minor: 0
+      patch: 0
+    predicate:
+      kind: name_equals
+      name: frontend
+requirements:
+  - name: minimum
+    sort: 1
+    operator: count_min
+    value:
+      kind: u64
+      value: 1
+policies:
+  - name: runtime
+    declared_by: owner
+    scope: external
+    requirement: minimum
