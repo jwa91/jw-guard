@@ -1,0 +1,21 @@
+{
+  "report_version": "1",
+  "outcome": "wire_error",
+  "input": {
+    "path": "__PATH__",
+    "format": "json"
+  },
+  "stage_reached": "wire",
+  "errors": [
+    {
+      "stage": "wire",
+      "code": "UNKNOWN_FIELD",
+      "path": [],
+      "message": "unknown field `unknown_root`, expected one of `schema_version`, `model`, `actors`, `referents`, `boundaries`, `edges`, `scopes`, `requirements`, `policies` at line 77 column 16",
+      "source": {
+        "line": 77,
+        "column": 16
+      }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "report_version": "1",
+  "outcome": "validation_error",
+  "input": {
+    "path": "__PATH__",
+    "format": "json"
+  },
+  "stage_reached": "validation",
+  "errors": [
+    {
+      "stage": "validation",
+      "code": "VALIDATION_MISSING_REFERENCE",
+      "path": [
+        "model",
+        "declared_by",
+        "ghost_actor"
+      ],
+      "message": "missing reference 'ghost_actor' for model.declared_by",
+      "source": null
+    },
+    {
+      "stage": "validation",
+      "code": "VALIDATION_MISSING_REFERENCE",
+      "path": [
+        "policies",
+        "declared_by",
+        "ghost_actor"
+      ],
+      "message": "missing reference 'ghost_actor' for policies.declared_by",
+      "source": null
+    },
+    {
+      "stage": "validation",
+      "code": "VALIDATION_MISSING_REFERENCE",
+      "path": [
+        "policies",
+        "requirement",
+        "ghost_requirement"
+      ],
+      "message": "missing reference 'ghost_requirement' for policies.requirement",
+      "source": null
+    },
+    {
+      "stage": "validation",
+      "code": "VALIDATION_MISSING_REFERENCE",
+      "path": [
+        "policies",
+        "scope",
+        "ghost_scope"
+      ],
+      "message": "missing reference 'ghost_scope' for policies.scope",
+      "source": null
+    }
+  ]
+}

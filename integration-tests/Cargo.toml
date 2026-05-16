@@ -13,3 +13,5 @@ jw-guard-adapter-yaml = { path = "../adapter-yaml" }
 jw-guard-adapter-toml = { path = "../adapter-toml" }
 jw-guard-core = { path = "../core" }
 jw-guard-declare = { path = "../declare", features = ["std"] }
+jw-guard-cli = { path = "../cli" }
+serde_json = "1"

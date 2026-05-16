@@ -1,0 +1,27 @@
+[package]
+name = "jw-guard-cli"
+description = "Contract-first CLI for jw-guard diagnostics."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "jw-guard"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+jw-guard-adapter-json = { path = "../adapter-json" }
+jw-guard-adapter-toml = { path = "../adapter-toml" }
+jw-guard-adapter-yaml = { path = "../adapter-yaml" }
+jw-guard-declare = { path = "../declare", features = ["std"] }
+jw-guard-wire = { path = "../wire" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+[dev-dependencies]
+jw-guard-canon = { path = "../canon" }
+jw-guard-core = { path = "../core" }

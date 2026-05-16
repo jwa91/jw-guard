@@ -1,0 +1,22 @@
+{
+  "report_version": "1",
+  "outcome": "validation_error",
+  "input": {
+    "path": "__PATH__",
+    "format": "json"
+  },
+  "stage_reached": "validation",
+  "errors": [
+    {
+      "stage": "validation",
+      "code": "VALIDATION_MISSING_REFERENCE",
+      "path": [
+        "model",
+        "declared_by",
+        "ghost"
+      ],
+      "message": "missing reference 'ghost' for model.declared_by",
+      "source": null
+    }
+  ]
+}
