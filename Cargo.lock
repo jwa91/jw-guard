@@ -308,6 +308,7 @@ dependencies = [
  "jw-guard-adapter-yaml",
  "jw-guard-core",
  "jw-guard-declare",
+ "jw-guard-mapper",
  "schemars",
  "serde",
  "serde_json",
