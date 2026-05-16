@@ -57,16 +57,10 @@ pub fn map_yaml_syntax_error(error: &jw_guard_adapter_yaml::YamlSyntaxError) -> 
 pub fn map_toml_syntax_error(error: &jw_guard_adapter_toml::TomlSyntaxError) -> ReportError {
     let (code, path, source) = match error {
         jw_guard_adapter_toml::TomlSyntaxError::Utf8 => (ErrorCode::InvalidUtf8, Vec::new(), None),
-        jw_guard_adapter_toml::TomlSyntaxError::Parse(parse) => (
-            ErrorCode::InvalidShape,
-            Vec::new(),
-            parse
-                .span()
-                .map(|span| SourceLocation {
-                    line: span.start + 1,
-                    column: 1,
-                }),
-        ),
+        // toml::de::Error::span() returns byte offsets, not line/column coordinates.
+        // Until we derive line/column from source text, keep source unset to avoid
+        // emitting misleading locations in the contract.
+        jw_guard_adapter_toml::TomlSyntaxError::Parse(_parse) => (ErrorCode::InvalidShape, Vec::new(), None),
         jw_guard_adapter_toml::TomlSyntaxError::Serialize(_) => (ErrorCode::InvalidShape, Vec::new(), None),
         jw_guard_adapter_toml::TomlSyntaxError::UnsupportedType { path, .. } => {
             (ErrorCode::InvalidShape, parse_path(path), None)

@@ -8,7 +8,7 @@ use crate::error_map::{
     map_declare_error, map_json_syntax_error, map_json_wire_shape_error, map_toml_syntax_error,
     map_validation_error, map_yaml_syntax_error, map_yaml_wire_shape_error,
 };
-use crate::report::{InputFormat, Stage, StageStop, ValidationReport};
+use crate::report::{ErrorCode, InputFormat, ReportError, Stage, StageStop, ValidationReport};
 
 #[derive(Debug)]
 pub enum ValidateFailure {
@@ -112,10 +112,8 @@ fn parse_json(bytes: &[u8], report: &mut ValidationReport) -> Option<jw_guard_wi
             report.push_error(mapped);
             None
         }
-        Err(jw_guard_adapter_json::AdapterError::Wire(jw_guard_adapter_json::WireError::Declare(errors))) => {
-            for error in &errors {
-                report.push_error(map_declare_error(error, Stage::Wire));
-            }
+        Err(jw_guard_adapter_json::AdapterError::Wire(jw_guard_adapter_json::WireError::Declare(_))) => {
+            push_unexpected_adapter_declare_error(report, "json");
             None
         }
     }
@@ -137,10 +135,8 @@ fn parse_yaml(bytes: &[u8], report: &mut ValidationReport) -> Option<jw_guard_wi
             report.push_error(mapped);
             None
         }
-        Err(jw_guard_adapter_yaml::AdapterError::Wire(jw_guard_adapter_yaml::WireError::Declare(errors))) => {
-            for error in &errors {
-                report.push_error(map_declare_error(error, Stage::Wire));
-            }
+        Err(jw_guard_adapter_yaml::AdapterError::Wire(jw_guard_adapter_yaml::WireError::Declare(_))) => {
+            push_unexpected_adapter_declare_error(report, "yaml");
             None
         }
     }
@@ -157,11 +153,25 @@ fn parse_toml(bytes: &[u8], report: &mut ValidationReport) -> Option<jw_guard_wi
             report.push_error(map_json_wire_shape_error(&error));
             None
         }
-        Err(jw_guard_adapter_toml::AdapterError::Wire(jw_guard_adapter_toml::WireError::Declare(errors))) => {
-            for error in &errors {
-                report.push_error(map_declare_error(error, Stage::Wire));
-            }
+        Err(jw_guard_adapter_toml::AdapterError::Wire(jw_guard_adapter_toml::WireError::Declare(_))) => {
+            push_unexpected_adapter_declare_error(report, "toml");
             None
         }
     }
+}
+
+fn push_unexpected_adapter_declare_error(report: &mut ValidationReport, format: &str) {
+    debug_assert!(
+        false,
+        "{format} adapter parse() returned Declare errors unexpectedly"
+    );
+    report.push_error(ReportError {
+        stage: Stage::Wire,
+        code: ErrorCode::DeclareConversionFailed,
+        path: Vec::new(),
+        message: format!(
+            "unexpected {format} adapter state: parse() returned declare conversion errors"
+        ),
+        source: None,
+    });
 }
