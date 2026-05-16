@@ -32,14 +32,29 @@ impl std::error::Error for YamlSyntaxError {}
 #[derive(Debug)]
 pub enum AdapterError {
     Syntax(YamlSyntaxError),
-    Wire(Vec<DeclareError>),
+    Wire(WireError),
+}
+
+#[derive(Debug)]
+pub enum WireError {
+    Shape(serde_yaml::Error),
+    Declare(Vec<DeclareError>),
 }
 
 impl fmt::Display for AdapterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Syntax(error) => write!(f, "yaml syntax error: {error}"),
-            Self::Wire(errors) => write!(f, "wire conversion failed with {} error(s)", errors.len()),
+            Self::Wire(error) => write!(f, "wire error: {error}"),
+        }
+    }
+}
+
+impl fmt::Display for WireError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape(error) => write!(f, "shape decode failed: {error}"),
+            Self::Declare(errors) => write!(f, "declare conversion failed with {} error(s)", errors.len()),
         }
     }
 }
@@ -48,14 +63,19 @@ impl std::error::Error for AdapterError {}
 
 pub fn parse(bytes: &[u8]) -> Result<WireDeclaredSpec, AdapterError> {
     reject_forbidden_yaml_features(bytes).map_err(AdapterError::Syntax)?;
-    serde_yaml::from_slice(bytes)
+    let value = serde_yaml::from_slice::<serde_yaml::Value>(bytes)
         .map_err(YamlSyntaxError::Serde)
-        .map_err(AdapterError::Syntax)
+        .map_err(AdapterError::Syntax)?;
+    serde_yaml::from_value(value)
+        .map_err(WireError::Shape)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn parse_to_spec(bytes: &[u8]) -> Result<DeclaredSpec, AdapterError> {
     let wire = parse(bytes)?;
-    DeclaredSpec::try_from(wire).map_err(AdapterError::Wire)
+    DeclaredSpec::try_from(wire)
+        .map_err(WireError::Declare)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn serialize(wire: &WireDeclaredSpec) -> Result<Vec<u8>, AdapterError> {
