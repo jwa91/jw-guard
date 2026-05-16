@@ -12,14 +12,29 @@ use serde_json::Deserializer;
 #[derive(Debug)]
 pub enum AdapterError {
     Syntax(serde_json::Error),
-    Wire(Vec<DeclareError>),
+    Wire(WireError),
+}
+
+#[derive(Debug)]
+pub enum WireError {
+    Shape(serde_json::Error),
+    Declare(Vec<DeclareError>),
 }
 
 impl fmt::Display for AdapterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Syntax(error) => write!(f, "json syntax error: {error}"),
-            Self::Wire(errors) => write!(f, "wire conversion failed with {} error(s)", errors.len()),
+            Self::Wire(error) => write!(f, "wire error: {error}"),
+        }
+    }
+}
+
+impl fmt::Display for WireError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape(error) => write!(f, "shape decode failed: {error}"),
+            Self::Declare(errors) => write!(f, "declare conversion failed with {} error(s)", errors.len()),
         }
     }
 }
@@ -28,12 +43,17 @@ impl std::error::Error for AdapterError {}
 
 pub fn parse(bytes: &[u8]) -> Result<WireDeclaredSpec, AdapterError> {
     reject_duplicate_keys_and_trailing_data(bytes)?;
-    serde_json::from_slice(bytes).map_err(AdapterError::Syntax)
+    let value = serde_json::from_slice::<serde_json::Value>(bytes).map_err(AdapterError::Syntax)?;
+    serde_json::from_value(value)
+        .map_err(WireError::Shape)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn parse_to_spec(bytes: &[u8]) -> Result<DeclaredSpec, AdapterError> {
     let wire = parse(bytes)?;
-    DeclaredSpec::try_from(wire).map_err(AdapterError::Wire)
+    DeclaredSpec::try_from(wire)
+        .map_err(WireError::Declare)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn serialize(wire: &WireDeclaredSpec) -> Result<Vec<u8>, AdapterError> {

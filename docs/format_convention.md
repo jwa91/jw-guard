@@ -101,6 +101,12 @@ The sentinel key is reserved by convention and uses `@` to avoid collision with
 For the current `WireDeclaredSpec`, no field currently uses `ExplicitOption<T>`.
 The `@none` rule is therefore dormant until such a field is added.
 
+Reference tri-state examples are available at:
+
+- `docs/examples/explicit_option_tri_state.json`
+- `docs/examples/explicit_option_tri_state.yaml`
+- `docs/examples/explicit_option_tri_state.toml`
+
 ## `schema_version` Handshake
 
 - `schema_version` is a required root field.

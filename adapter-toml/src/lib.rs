@@ -13,7 +13,6 @@ pub enum TomlSyntaxError {
     Serialize(toml::ser::Error),
     UnsupportedType { path: String, kind: &'static str },
     InvalidSentinel { path: String, reason: &'static str },
-    JsonBridge(serde_json::Error),
 }
 
 impl fmt::Display for TomlSyntaxError {
@@ -24,7 +23,6 @@ impl fmt::Display for TomlSyntaxError {
             Self::Serialize(error) => write!(f, "{error}"),
             Self::UnsupportedType { path, kind } => write!(f, "unsupported TOML type at {path}: {kind}"),
             Self::InvalidSentinel { path, reason } => write!(f, "invalid @none sentinel at {path}: {reason}"),
-            Self::JsonBridge(error) => write!(f, "{error}"),
         }
     }
 }
@@ -34,14 +32,29 @@ impl std::error::Error for TomlSyntaxError {}
 #[derive(Debug)]
 pub enum AdapterError {
     Syntax(TomlSyntaxError),
-    Wire(Vec<DeclareError>),
+    Wire(WireError),
+}
+
+#[derive(Debug)]
+pub enum WireError {
+    Shape(serde_json::Error),
+    Declare(Vec<DeclareError>),
 }
 
 impl fmt::Display for AdapterError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Syntax(error) => write!(f, "toml syntax error: {error}"),
-            Self::Wire(errors) => write!(f, "wire conversion failed with {} error(s)", errors.len()),
+            Self::Wire(error) => write!(f, "wire error: {error}"),
+        }
+    }
+}
+
+impl fmt::Display for WireError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Shape(error) => write!(f, "shape decode failed: {error}"),
+            Self::Declare(errors) => write!(f, "declare conversion failed with {} error(s)", errors.len()),
         }
     }
 }
@@ -56,13 +69,15 @@ pub fn parse(bytes: &[u8]) -> Result<WireDeclaredSpec, AdapterError> {
     let bridged = bridge_toml_to_json("$".to_string(), value)
         .map_err(AdapterError::Syntax)?;
     serde_json::from_value(bridged)
-        .map_err(TomlSyntaxError::JsonBridge)
-        .map_err(AdapterError::Syntax)
+        .map_err(WireError::Shape)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn parse_to_spec(bytes: &[u8]) -> Result<DeclaredSpec, AdapterError> {
     let wire = parse(bytes)?;
-    DeclaredSpec::try_from(wire).map_err(AdapterError::Wire)
+    DeclaredSpec::try_from(wire)
+        .map_err(WireError::Declare)
+        .map_err(AdapterError::Wire)
 }
 
 pub fn serialize(wire: &WireDeclaredSpec) -> Result<Vec<u8>, AdapterError> {
@@ -129,9 +144,21 @@ fn convert_table(path: String, table: toml::map::Map<String, toml::Value>) -> Re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jw_guard_wire::ExplicitOptionWire;
+    use serde::Deserialize;
 
     fn parse_toml(input: &str) -> toml::Value {
         toml::from_str(input).expect("test TOML should parse")
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct ExplicitOptionCarrier {
+        #[serde(default)]
+        unspecified: ExplicitOptionWire<u64>,
+        #[serde(default)]
+        none: ExplicitOptionWire<u64>,
+        #[serde(default)]
+        some: ExplicitOptionWire<u64>,
     }
 
     #[test]
@@ -182,5 +209,22 @@ mod tests {
             }
             other => panic!("unexpected error: {other:?}"),
         }
+    }
+
+    #[test]
+    fn bridge_supports_explicit_option_tri_state_for_toml_convention() {
+        let value = parse_toml(
+            r#"
+none = { "@none" = true }
+some = 7
+"#,
+        );
+        let bridged = bridge_toml_to_json("$".to_string(), value).expect("bridge should succeed");
+        let decoded: ExplicitOptionCarrier =
+            serde_json::from_value(bridged).expect("decoded carrier should deserialize");
+
+        assert!(matches!(decoded.unspecified, ExplicitOptionWire::Unspecified));
+        assert!(matches!(decoded.none, ExplicitOptionWire::ExplicitNone));
+        assert!(matches!(decoded.some, ExplicitOptionWire::ExplicitSome(7)));
     }
 }
