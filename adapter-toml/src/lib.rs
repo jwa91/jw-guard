@@ -125,3 +125,62 @@ fn convert_table(path: String, table: toml::map::Map<String, toml::Value>) -> Re
     }
     Ok(Value::Object(mapped))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse_toml(input: &str) -> toml::Value {
+        toml::from_str(input).expect("test TOML should parse")
+    }
+
+    #[test]
+    fn bridge_maps_valid_none_sentinel_to_null() {
+        let value = parse_toml("root = { \"@none\" = true }");
+        let bridged = bridge_toml_to_json("$".to_string(), value).expect("bridge should succeed");
+
+        assert_eq!(bridged["root"], Value::Null);
+    }
+
+    #[test]
+    fn bridge_rejects_none_sentinel_with_payload_keys() {
+        let value = parse_toml("root = { \"@none\" = true, other = \"x\" }");
+        let error = bridge_toml_to_json("$".to_string(), value).expect_err("bridge should fail");
+
+        match error {
+            TomlSyntaxError::InvalidSentinel { path, reason } => {
+                assert_eq!(path, "$.root");
+                assert_eq!(reason, "sentinel table must not contain payload keys");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bridge_rejects_none_sentinel_when_false() {
+        let value = parse_toml("root = { \"@none\" = false }");
+        let error = bridge_toml_to_json("$".to_string(), value).expect_err("bridge should fail");
+
+        match error {
+            TomlSyntaxError::InvalidSentinel { path, reason } => {
+                assert_eq!(path, "$.root");
+                assert_eq!(reason, "@none must be true");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bridge_rejects_toml_datetime_values() {
+        let value = parse_toml("root = 1979-05-27T07:32:00Z");
+        let error = bridge_toml_to_json("$".to_string(), value).expect_err("bridge should fail");
+
+        match error {
+            TomlSyntaxError::UnsupportedType { path, kind } => {
+                assert_eq!(path, "$.root");
+                assert_eq!(kind, "datetime");
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+}

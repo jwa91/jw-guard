@@ -98,6 +98,9 @@ TOML sentinel constraints:
 The sentinel key is reserved by convention and uses `@` to avoid collision with
 `SymbolicName` values (`[a-z0-9_-]` only).
 
+For the current `WireDeclaredSpec`, no field currently uses `ExplicitOption<T>`.
+The `@none` rule is therefore dormant until such a field is added.
+
 ## `schema_version` Handshake
 
 - `schema_version` is a required root field.
