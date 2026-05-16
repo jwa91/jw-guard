@@ -1,85 +1,140 @@
-# Agent Guardrails: Core Boundary Constraints
+# Agent Guardrails
 
-This file is authoritative for agent behavior when editing `jw-guard`.
-Use it to preserve strictness and avoid semantic drift.
+This file is authoritative for agent behavior when editing `jw-guard`. Read it
+before any change. It points to the ADRs and concept docs that own specific
+constraints; this file is the index and the operating rules.
 
-## Mission Boundary
+## Mission
 
-- North Star: universal, unopinionated, deterministic security-model type system.
-- Core package (`jw-guard-core`) is type-only baseline and must remain neutral.
-- Precision-first and strictness-first override convenience.
+`jw-guard` is a universal, strict, deterministic security-model type system.
+It stays unopinionated at the core and composes upward into declaration,
+mapping, evaluation, and (later) enforcement layers. Precision and strictness
+override convenience. When in doubt about a structural choice, default to the
+narrower, more deterministic option.
 
-## Hard Constraints (Do Not Violate)
+## Authoritative documents (in resolution order)
 
-1. **Type-only core**
-   - `core` may define types, deterministic constructors, and deterministic validators.
-   - `core` must not include runtime enforcement/orchestration/remediation behavior.
+1. **`AGENTS.md`** (this file) — operating rules and the ADR index.
+2. **`docs/adr/`** — accepted structural decisions, each with citable
+   evidence and a re-open trigger. ADRs win over concepts when they disagree.
+3. **`docs/concepts/`** — conceptual baseline (terminology, fundamental form,
+   layer definitions). The `README.md` there tracks locked vs provisional
+   concepts.
+4. **`docs/format_convention.md`** — normative contract for format adapters.
 
-2. **No hidden policy opinion in core**
-   - Do not encode project posture defaults as core truth.
-   - Forbidden in core: implicit mandates like "signing must use airlock", hardening profile defaults, risk heuristics.
-   - Policy posture belongs in higher layers (`declare`, profiles, evaluators), not core axioms.
+Drafts and historical exploration notes never outrank the four documents above.
 
-3. **Deterministic construction only**
-   - Constructors and validators must be total, pure, and stable for identical inputs.
-   - No time/env/network/fs/process/randomness in core validity logic.
-   - No hidden semantic defaults unless explicitly schema-declared.
+## ADR index
 
-4. **Locked type-axis discipline**
-   - `L0` fixed primitive baseline.
-   - `L1-L2` only for current stable lock scope.
-   - `L3+` is provisional; do not silently elevate semantics into core.
+- [ADR-0001 — Type-only, policy-neutral core](docs/adr/0001-type-only-neutral-core.md):
+  `core` may define types, deterministic constructors, and deterministic
+  validators only. No side effects, no policy posture defaults.
+- [ADR-0002 — Type-axis lock at L1–L2; L3+ provisional](docs/adr/0002-type-axis-lock-l1-l2-l3-provisional.md):
+  deconstructability is guaranteed only at L1 and L2; L3+ remains
+  design-strategy-dependent.
+- [ADR-0003 — Three orthogonal axes: type, graph, observation](docs/adr/0003-three-orthogonal-axes.md):
+  type, graph, and observation/applicability semantics stay separate; no
+  overloaded type fuses them.
+- [ADR-0004 — Syntax-only format adapters](docs/adr/0004-syntax-only-format-adapters.md):
+  `adapter-{json,yaml,toml}` parse syntax only; declarers own policy
+  vocabulary; two-stage error model is mandatory.
+- [ADR-0005 — Uncertainty-preserving evaluation outcomes](docs/adr/0005-uncertainty-preserving-outcomes.md):
+  evaluation outcomes preserve `Unknown` and `NotApplicable`; never collapse
+  to `bool`; validation accumulates.
 
-5. **Axis orthogonality**
-   - Keep type, graph, and observation semantics explicit and separable.
-   - Do not collapse axis semantics into one overloaded type.
+## Hard constraints (do not violate)
 
-6. **Evidence semantics boundary**
-   - Evidence is modeled as structured claims/provenance/resolution state.
-   - Core must not force binary compliance collapse.
-   - Keep uncertainty-explicit outcomes (`Unknown`, `ContradictoryEvidence`, `StaleEvidence`) available.
+Each constraint cites the ADR that owns it. The ADR is the place to extend or
+contest the rule.
 
-## Learned Anti-Patterns To Avoid
+1. **Type-only core.** `core` defines types, deterministic constructors, and
+   deterministic validators only — no runtime enforcement, orchestration, or
+   remediation. *(ADR-0001)*
+2. **No hidden policy opinion in core.** No implicit mandates ("signing must
+   use airlock"), hardening profile defaults, or risk heuristics in `core`.
+   Policy posture belongs in `declare`, profiles, and evaluators. *(ADR-0001)*
+3. **Deterministic construction only.** Constructors and validators are
+   total, pure, and stable for identical inputs. No time, env, network, fs,
+   process, or randomness in `core` validity logic. *(ADR-0001)*
+4. **Locked type-axis discipline.** L0 is the fixed primitive baseline; L1
+   and L2 are the current stable lock scope. L3+ is provisional and must not
+   silently elevate semantics into `core`. *(ADR-0002)*
+5. **Axis orthogonality.** Keep type, graph, and observation semantics
+   explicit and separable. Do not collapse axis semantics into one overloaded
+   type. *(ADR-0003)*
+6. **Adapter boundary.** Format adapters perform syntax-to-DTO translation
+   only — no semantic validation, no defaults, no reordering, no reference
+   resolution. Two error stages (syntax / wire-shape) are exposed distinctly.
+   *(ADR-0004)*
+7. **Uncertainty-preserving outcomes.** Evaluation outcomes keep `Unknown`
+   and `NotApplicable` available; no public API in `core` or `eval` collapses
+   a policy decision to `bool`. Validation surfaces accumulate violations.
+   *(ADR-0005)*
 
-- Tests claiming "enforcement complete" when they only prove structural validity.
-- Using boolean pass/fail as the only evaluation semantics in core.
-- Adding convenience defaults that alter normative meaning.
+## Style for core changes
+
+- Prefer constructor gates to runtime checks for invalid-state prevention.
+- Return explicit typed violations and errors; never strings, never bools.
+- Keep enums closed and exhaustive where possible; no wildcard match arms
+  except where the type explicitly requires it.
+- Keep APIs lean: smallest composable type additions; no speculative
+  architecture.
+- Newtype-wrap IDs and scalars at the type boundary; rely on the type system
+  rather than runtime checks to prevent cross-field confusion.
+
+## Learned anti-patterns to avoid
+
+- Tests claiming "enforcement complete" when they only prove structural
+  validity. *(see ADR-0005)*
+- Using boolean pass/fail as the only evaluation semantics in `core` or
+  `eval`. *(ADR-0005)*
+- Adding convenience defaults that alter normative meaning. *(ADR-0001)*
 - Mixing declaration intent with runtime observation or enforcement logic.
-- Hard-coding policy vocabulary/allowed values in shared language layers too early.
+  *(ADR-0001, ADR-0003)*
+- Hard-coding policy vocabulary or allowed value sets in shared language or
+  format layers before a declarer-defined sequence exists. *(ADR-0004)*
+- Inventing parser source locations from byte offsets when the source text is
+  unavailable for conversion. *(ADR-0004)*
 
-## YAML Policy Boundary Rule
+## Adapter implementation notes
 
-- YAML adapters may adapt YAML syntax/shape only; they must not invent policy posture.
-- Policy lossiness and boundary cuts are declarer-owned decisions and must be explicit.
-- Preferred sequencing for policy authoring evolution:
-  1) template tagging
-  2) declarer-defined allowed value sets
-  3) typed value bindings
-  4) schema hardening from declared constraints
-- If a schema encodes domain opinions before this sequence is explicit, treat it as
-  reference-only work and do not merge into mainline.
+Concrete reminders that follow from ADR-0004 and have already cost time:
 
-## Required Style For Core Changes
+- `parse()` returns syntax/shape errors only. Declare-conversion errors are
+  produced in `DeclaredSpec::try_from(wire)`. Do not write unreachable match
+  arms that imply a stage the code path cannot produce.
+- For TOML, never reinterpret `toml::de::Error::span()` (a byte range) as
+  line/column coordinates without the source text. Emit no location rather
+  than an inaccurate one.
+- For YAML, detect forbidden features (anchors, aliases, tags, merge keys,
+  multi-doc) via parser events, never via substring heuristics on the input.
+- Every wire DTO struct must carry `#[serde(deny_unknown_fields)]`.
 
-- Prefer constructor gates for invalid-state prevention.
-- Return explicit typed violations/errors.
-- Keep enums closed and exhaustive where possible.
-- Keep APIs lean: smallest composable type additions, no speculative architecture.
+## YAML policy boundary (specific to ADR-0004)
 
-## Minimal Acceptance Checklist (for any core PR)
+- YAML adapters may adapt YAML syntax and shape only; they must not invent
+  policy posture.
+- Preferred sequencing for policy authoring evolution (declarer-owned):
+  1. template tagging
+  2. declarer-defined allowed value sets
+  3. typed value bindings
+  4. schema hardening from declared constraints
+- If a schema encodes domain opinions before this sequence is explicit, treat
+  it as reference-only work and do not merge into mainline.
 
-- [ ] No hidden policy/default posture introduced.
-- [ ] No runtime side effects in core logic.
-- [ ] Deterministic behavior preserved (same input -> same output/errors).
-- [ ] L1/L2 lock scope respected; no silent L3+ elevation.
-- [ ] Outcome semantics remain uncertainty-preserving (no forced bool-only collapse).
+## Acceptance checklist for any core or adapter PR
+
+- [ ] No hidden policy or default posture introduced. *(ADR-0001, ADR-0004)*
+- [ ] No runtime side effects in core logic. *(ADR-0001)*
+- [ ] Deterministic behavior preserved (same input → same output / errors).
+      *(ADR-0001)*
+- [ ] L1/L2 lock scope respected; no silent L3+ elevation. *(ADR-0002)*
+- [ ] Axis orthogonality preserved; no overloaded fusion across type, graph,
+      or observation. *(ADR-0003)*
+- [ ] Outcome semantics remain uncertainty-preserving (no forced bool-only
+      collapse). *(ADR-0005)*
+- [ ] Format adapters stay syntax-only; two-stage error model intact.
+      *(ADR-0004)*
 - [ ] Tests describe exactly what they validate (no over-claims).
-
-## Recent CLI/Adapter Learnings
-
-- When reporting parser locations, never reinterpret byte offsets as line/column coordinates.
-  - In particular, `toml::de::Error::span()` is a byte range; if source text is unavailable for conversion, emit no location rather than inaccurate coordinates.
-- Keep adapter stage handling aligned with actual adapter APIs.
-  - `parse()` returns syntax/shape errors; declare conversion errors are produced in `DeclaredSpec::try_from(wire)`.
-  - Avoid unreachable error-match arms that imply stage behavior the code path cannot produce.
-
+- [ ] If a change touches structure that an ADR governs, the ADR is either
+      still accurate, or this PR also updates the ADR.
